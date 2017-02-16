@@ -1,0 +1,2 @@
+The Lightning Artist Toolkit is a suite of tools for creating frame-by-frame, hand-drawn animation in VR.
+Its output is readable in any 3D graphics application and ready to use in real-world production scenarios.
