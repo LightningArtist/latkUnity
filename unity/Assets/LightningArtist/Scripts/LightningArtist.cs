@@ -623,10 +623,10 @@ public class LightningArtist : MonoBehaviour {
 							}
 
 							if (j == layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count - 1) {
-								sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "]}" + "\n";
+								sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}" + "\n";
 								sbb += "                                    ]" + "\n";
 							} else {
-								sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "]}," + "\n";
+								sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}," + "\n";
 							}
 						}
 					} else {
