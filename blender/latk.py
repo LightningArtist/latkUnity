@@ -34,6 +34,7 @@ bl_info = {
 }
 
 import bpy
+import bpy_extras
 from mathutils import *
 from math import sqrt
 import json
@@ -52,10 +53,80 @@ from bpy_extras.io_utils import (ImportHelper, ExportHelper)
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-def bakeParentToChild(start, end):
+def createMtlPalette(numPlaces=5, numReps = 1):
+    palette = None
+    removeUnusedMtl()
+    for h in range(0, numReps):
+        palette = []
+        #print("1-3. Creating palette of all materials...")
+        for mtl in bpy.data.materials:
+            foundNewMtl = True
+            for palMtl in palette:
+                if (compareTuple(getDiffuseColor(mtl), getDiffuseColor(palMtl), numPlaces=numPlaces)==True):
+                    foundNewMtl = False
+                    break
+            if (foundNewMtl==True):
+                #print("Found " + mtl.name)
+                palette.append(mtl)
+        for i, mtl in enumerate(palette):
+            mtl.name = "Palette_" + str(i+1)
+        #print("2-3. Matching palette colors for all objects...")
+        for obj in bpy.context.scene.objects:
+            try:
+                for i, mtl in enumerate(obj.data.materials):
+                    for palMtl in palette:
+                        if (compareTuple(getDiffuseColor(mtl), getDiffuseColor(palMtl), numPlaces=numPlaces)==True):
+                            obj.data.materials[i] = palMtl
+            except:
+                pass
+        #print("3-3. Removing unused materials...")
+        removeUnusedMtl()
+    #~
+    print ("Created palette of " + str(len(palette)) + " materials.")
+    return palette
+
+def removeUnusedMtl():
+    # http://blender.stackexchange.com/questions/5300/how-can-i-remove-all-unused-materials-from-a-file/35637#35637
+    for mtl in bpy.data.materials:
+        if not mtl.users:
+            bpy.data.materials.remove(mtl)
+
+'''
+def sortLists(list1, list2):
+    list1.sort(key=lambda x: x[0])
+    ind = [i[0] for i in sorted(enumerate(list2),key=lambda x: x[1])]
+    list1 = [i[0] for i in sorted(zip(list1, ind),key=lambda x: x[1])]
+    return list1
+'''
+def clearState():
+    for ob in bpy.data.objects.values():
+        try:
+            ob.selected=False
+        except:
+            pass
+    bpy.context.scene.objects.active = None
+
+def getActiveCurvePoints():
+    target = s()[0]
+    if (target.data.splines[0].type=="BEZIER"):
+        return target.data.splines.active.bezier_points
+    else:
+        return target.data.splines.active.points        
+        
+def bakeParentToChild(start=None, end=None):
+    if (start==None and end==None):
+        start, end = getStartEnd()
     # https://www.blender.org/api/blender_python_api_2_72_1/bpy.ops.nla.html
     #bpy.ops.nla.bake(frame_start=start, frame_end=end, step=1, only_selected=True, visual_keying=True, clear_constraints=True, clear_parents=True, bake_types={'OBJECT'})    
     bpy.ops.nla.bake(frame_start=start, frame_end=end, step=1, only_selected=True, visual_keying=True, clear_constraints=True, clear_parents=True, use_current_action=True, bake_types={'OBJECT'})    
+
+def bakeParentToChildByName(name="crv"):
+    start, end = getStartEnd()
+    target = matchName(name)
+    for obj in target:
+        bpy.context.scene.objects.active = obj
+        #print(bpy.context.scene.objects.active.name)
+        bakeParentToChild(start, end)
 
 def importAppend(blendfile, section, obj, winDir=False):
     # http://blender.stackexchange.com/questions/38060/how-to-link-append-with-a-python-script
@@ -71,11 +142,78 @@ def importAppend(blendfile, section, obj, winDir=False):
     #~
     bpy.ops.wm.append(filepath=url, filename=obj, directory=section)
 
+def writeTextFile(name="test.txt", lines=None):
+    file = open(name,"w") 
+    for line in lines:
+        file.write(line) 
+    file.close() 
+
+def getWorldCoords(co=None, camera=None, usePixelCoords=True, useRenderScale=True, flipV=True):
+    # https://blender.stackexchange.com/questions/882/how-to-find-image-coordinates-of-the-rendered-vertex
+    # Test the function using the active object (which must be a camera)
+    # and the 3D cursor as the location to find.
+    scene = bpy.context.scene
+    if not camera:
+        camera = bpy.context.object
+    if not co:
+        co = bpy.context.scene.cursor_location
+    #~
+    co_2d = bpy_extras.object_utils.world_to_camera_view(scene, camera, co)
+    pixel_2d = None
+    #~
+    if (usePixelCoords==False):
+        print("2D Coords: ", co_2d)
+        return co_2d
+    else:
+        render_size = getSceneResolution(useRenderScale)
+        if (flipV==True):
+            pixel_2d = (round(co_2d.x * render_size[0]), round(render_size[1] - (co_2d.y * render_size[1])))
+        else:
+            pixel_2d = (round(co_2d.x * render_size[0]), round(co_2d.y * render_size[1]))
+        print("Pixel Coords: ", pixel_2d)
+        return pixel_2d
+
+def getSceneResolution(useRenderScale=True):
+    # https://blender.stackexchange.com/questions/882/how-to-find-image-coordinates-of-the-rendered-vertex
+    scene = bpy.context.scene
+    render_scale = scene.render.resolution_percentage / 100
+    if (useRenderScale==True):
+        return (int(scene.render.resolution_x * render_scale), int(scene.render.resolution_y * render_scale))
+    else:
+        return (int(scene.render.resolution_x), int(scene.render.resolution_y))
+
+def setSceneResolution(width=1920, height=1080, scale=50):
+    # https://blender.stackexchange.com/questions/9164/modify-render-settings-for-all-scenes-using-python
+    for scene in bpy.data.scenes:
+        scene.render.resolution_x = width
+        scene.render.resolution_y = height
+        scene.render.resolution_percentage = scale
+        scene.render.use_border = False
+
+def readTextFile(name="text.txt"):
+    file = open(name, "r") 
+    return file.read() 
+
 def deselect():
     bpy.ops.object.select_all(action='DESELECT')
 
 def selectAll():
     bpy.ops.object.select_all(action='SELECT')
+
+# TODO fix so you can find selected group regardless of active object
+def getActiveGroup():
+    obj = bpy.context.scene.objects.active
+    for group in bpy.data.groups:
+        for groupObj in group.objects:
+            if(obj.name == groupObj.name):
+                return group
+    return None
+
+def getChildren(target=None):
+    if not target:
+        target=s()[0]
+    # https://www.blender.org/forum/viewtopic.php?t=8661
+    return [ob for ob in bpy.context.scene.objects if ob.parent == target]
 
 def groupName(name="crv", gName="myGroup"):
     deselect()
@@ -200,6 +338,34 @@ def deleteDuplicateStrokes(fromAllFrames = False):
                     deleteSelected()
             except:
                 pass
+
+def consolidateGroups():
+    wholeNames = []
+    mergeNames = []
+    for group in bpy.data.groups:
+        if("." in group.name):
+            mergeNames.append(group.name)
+        else:
+            wholeNames.append(group.name)
+    for sourceName in mergeNames:
+        sourceGroup = bpy.data.groups[sourceName]
+        destGroup = None
+        for destName in wholeNames:
+            if (sourceName.split(".")[0] == destName):
+                destGroup = bpy.data.groups[destName]
+                break
+        if (destGroup==None):
+            break
+        else:
+            for obj in sourceGroup.objects:
+                try:
+                    destGroup.objects.link(obj)
+                except:
+                    pass
+            removeGroup(sourceName)
+    print(mergeNames)
+    print(wholeNames)
+
 
 def sumPoints(stroke):
     x = 0
@@ -387,9 +553,9 @@ def joinObjects(target=None, center=False):
     #~
     for i in range(1, len(target)):
         try:
-        	scn.objects.unlink(target[i])
+            scn.objects.unlink(target[i])
         except:
-        	pass
+            pass
         #try:
             #removeObj(target[i].name)
         #except:
@@ -624,6 +790,32 @@ def copyFramePoints(source, dest, limit=None, pointsPercentage=1):
             for l in range(0, len(strokeSource.points)):
                 strokeDest.points[l].co = strokeSource.points[l].co
 
+def createCamera():
+    # https://blenderartists.org/forum/showthread.php?312512-how-to-add-an-empty-and-a-camera-using-python-script
+   cam = bpy.data.cameras.new("Camera")
+   cam_ob = bpy.data.objects.new("Camera", cam)
+   bpy.context.scene.objects.link(cam_ob)
+   return cam_ob
+
+def getActiveCamera():
+    # https://blender.stackexchange.com/questions/8245/find-active-camera-from-python
+    cam_ob = bpy.context.scene.camera
+    #~
+    if cam_ob is None:
+        print("no scene camera")
+        return None
+    elif cam_ob.type == 'CAMERA':
+        print("regular scene cam")
+        return cam_ob
+    else:
+        print("%s object as camera" % cam_ob.type)
+        ob = bpy.context.object
+        if ob is not None and ob.type == 'CAMERA':
+            print("Active camera object")
+            return ob
+        else:
+            return None
+
 def createStrokes(strokes, palette=None):
     if (palette == None):
         palette = getActivePalette()
@@ -688,6 +880,26 @@ def chooseShot(shot):
     return [start, end]
 '''
 
+def showHide(obj, hide, keyframe=False, frame=None):
+    obj.hide = hide
+    obj.hide_render = hide
+    #_obj.keyframe_insert(data_path="hide", frame=_frame) 
+    #_obj.keyframe_insert(data_path="hide_render", frame=_frame) 
+
+def showHideChildren(hide):
+    target = getChildren()
+    for obj in target:
+        showHide(obj, hide)
+
+def rgbToHex(color, normalized=False):
+    if (normalized==True):
+        return "#%02x%02x%02x" % (int(color[0] * 255.0), int(color[1] * 255.0), int(color[2] * 255.0))
+    else:
+        return "#%02x%02x%02x" % (int(color[0]), int(color[1]), int(color[2]))
+
+def normRgbToHex(color):
+    return rgbToHex(color, normalized=True)
+
 def moveShot(start, end, x, y, z):
     gp = bpy.context.scene.grease_pencil
     target = (start, end)
@@ -701,9 +913,9 @@ def moveShot(start, end, x, y, z):
                     layer.frames[currentFrame].strokes[i].points[j].co.y += y
                     layer.frames[currentFrame].strokes[i].points[j].co.z += z
 
-def fixContext():
+def fixContext(ctx="VIEW_3D"):
     original_type = bpy.context.area.type
-    bpy.context.area.type = "VIEW_3D"
+    bpy.context.area.type = ctx
     return original_type
 
 def returnContext(original_type):
@@ -734,6 +946,31 @@ def getActiveGp(_name="GPencil"):
     print("Active GP block is: " + gp.name)
     return gp
 
+def forceDrawMode():
+    #https://blenderartists.org/forum/showthread.php?255425-How-to-use-quot-bpy-ops-gpencil-draw()-quot
+    ctx = fixContext()
+    #bpy.ops.gpencil.draw('INVOKE_REGION_WIN', mode='DRAW_POLY', stroke=[{"name":"", "pen_flip":False, "is_start":True, "location":(0, 0, 0),"mouse":(0,0), "pressure":1, "time":0}, {"name":"", "pen_flip":False, "is_start":True, "location":(0, 0, 0), "mouse":(0,0), "pressure":1, "time":0}])
+    returns = bpy.ops.gpencil.draw(mode="DRAW")
+    returnContext(ctx)
+    return returns
+
+def initGp():
+    # https://blender.stackexchange.com/questions/48992/how-to-add-points-to-a-grease-pencil-stroke-or-make-new-one-with-python-script
+    scene = bpy.context.scene
+    if not scene.grease_pencil:
+        a = [ a for a in bpy.context.screen.areas if a.type == 'VIEW_3D' ][0]
+        override = {
+            'scene'         : scene,
+            'screen'        : bpy.context.screen,
+            'object'        : bpy.context.object,
+            'area'          : a,
+            'region'        : a.regions[0],
+            'window'        : bpy.context.window,
+            'active_object' : bpy.context.object
+        }
+        bpy.ops.gpencil.data_add(override)
+    return scene.grease_pencil
+
 def getActivePalette():
     gp = getActiveGp()
     palette = gp.palettes.active
@@ -754,6 +991,125 @@ def getActiveLayer():
     gp = getActiveGp()
     layer = gp.layers.active
     return layer
+
+def setActiveLayer(name="Layer"):
+    gp = getActiveGp()
+    gp.layers.active = gp.layers[name]
+    return gp.layers.active
+
+def deleteLayer(name=None):
+    gp = getActiveGp()
+    if not name:
+        name = gp.layers.active.info
+    gp.layers.remove(gp.layers[name])
+
+def duplicateLayer():
+    ctx = fixContext()
+    bpy.ops.gpencil.layer_duplicate()
+    returnContext(ctx)
+    return getActiveLayer()
+
+def splitLayer(splitNum=None):
+    if not splitNum:
+        splitNum = getActiveFrameTimelineNum()
+    layer1 = getActiveLayer()
+    layer2 = duplicateLayer()
+    #~
+    for frame in layer1.frames:
+        if (frame.frame_number>=splitNum):
+            layer1.frames.remove(frame)
+    for frame in layer2.frames:
+        if (frame.frame_number<splitNum):
+            layer2.frames.remove(frame)
+    #~
+    if (len(layer2.frames) > 0):
+        lastNum = layer2.frames[0].frame_number
+        # cap the new layers with blank frames
+        #blankFrame(layer1, bpy.context.scene.frame_current)
+        #blankFrame(layer2, bpy.context.scene.frame_current-1)
+        blankFrame(layer1, lastNum)
+        blankFrame(layer2, lastNum-1)
+        return layer2
+    else:
+        cleanEmptyLayers()
+        return None
+
+def blankFrame(layer=None, frame=None):
+    if not layer:
+        layer = getActiveLayer()
+    if not frame:
+        frame = bpy.context.scene.frame_current
+    try:
+        layer.frames.new(frame)
+    except:
+        pass
+
+def getActiveFrameNum():
+    returns = -1
+    layer = getActiveLayer()
+    for i, frame in enumerate(layer.frames):
+        if (frame == layer.active_frame):
+            returns = i
+    return returns
+    #return getActiveFrame().frame_number
+
+def getActiveFrameTimelineNum():
+    return getActiveLayer().frames[getActiveFrameNum()].frame_number
+
+def checkLayersAboveFrameLimit(limit=20):
+    gp = getActiveGp()
+    returns = []
+    print("~ ~ ~ ~")
+    for layer in gp.layers:
+        if (len(layer.frames) > limit + 1): # accounting for extra end cap frame
+            returns.append(layer)
+            print("layer " + layer.info + " is over limit " + str(limit) + " with " + str(len(layer.frames)) + " frames.")
+    print(" - - - " + str(len(returns)) + " total layers over limit.")
+    print("~ ~ ~ ~")
+    return returns
+
+def splitLayersAboveFrameLimit(limit=20):
+    layers = checkLayersAboveFrameLimit(limit)
+    #~
+    if (len(layers) <= 0):
+        return
+    for layer in layers:
+        setActiveLayer(layer.info)
+        for i in range(0, int(getLayerLength()/limit)):
+            currentLayer = getActiveLayer()
+            print("* " + currentLayer.info + ": pass " + str(i))
+            if (getLayerLength() < limit or currentLayer.lock==True):
+                break
+            goToFrame(currentLayer.frames[limit].frame_number)
+            setActiveFrame(currentLayer.frames[limit].frame_number)
+            #print("We are at layer " + currentLayer.info + " and frame " + str(getActiveFrameNum()) + " and timeline " + str(getActiveFrameTimelineNum()))
+            #currentLayer = splitLayer(currentLayer.frames[limit].frame_number)
+            splitLayer(currentLayer.frames[limit].frame_number)
+            #setActiveLayer(currentLayer.info)
+            print("Split layer " + currentLayer.info + " with " + str(len(currentLayer.frames)) + " frames.")
+    #else:
+        #print("No layers are above frame limit " + str(limit) + ".")
+
+splf = splitLayersAboveFrameLimit
+
+def getLayerLength(name=None):
+    layer = None
+    if not name:
+        layer = getActiveLayer()
+    else:
+        layer = getActiveGp().layers[name]
+    return len(layer.frames)
+
+def cleanEmptyLayers():
+    gp = getActiveGp()
+    for layer in gp.layers:
+        if (len(layer.frames) == 0):
+            gp.layers.remove(layer)
+
+def clearPalette():
+    palette = getActivePalette()
+    for color in palette.colors:
+        palette.colors.remove(color)
 
 def createPoint(_stroke, _index, _point, pressure=1, strength=1):
     _stroke.points[_index].co = _point
@@ -779,6 +1135,37 @@ def createColor(_color):
     #~        
     print("Active color is: " + "\"" + palette.colors.active.name + "\" " + str(palette.colors.active.color))
     return color
+
+# ~ ~ ~ 
+def createColorWithPalette(_color, numPlaces=7, maxColors=0):
+    #frame = getActiveFrame()
+    palette = getActivePalette()
+    matchingColorIndex = -1
+    places = numPlaces
+    for i in range(0, len(palette.colors)):
+        if (roundVal(_color[0], places) == roundVal(palette.colors[i].color.r, places) and roundVal(_color[1], places) == roundVal(palette.colors[i].color.g, places) and roundVal(_color[2], places) == roundVal(palette.colors[i].color.b, places)):
+            matchingColorIndex = i
+    #~
+    if (matchingColorIndex == -1):
+        if (maxColors<1 or len(palette.colors)<maxColors):
+            color = palette.colors.new()
+            color.color = _color
+        else:
+            distances = []
+            sortedColors = []
+            for color in palette.colors:
+                sortedColors.append(color)
+            for color in sortedColors:
+                distances.append(getDistance(_color, color.color))
+            sortedColors.sort(key=dict(zip(sortedColors, distances)).get)
+            palette.colors.active = palette.colors[sortedColors[0].name]
+    else:
+        palette.colors.active = palette.colors[matchingColorIndex]
+        color = palette.colors[matchingColorIndex]
+    #~        
+    print("Active color is: " + "\"" + palette.colors.active.name + "\" " + str(palette.colors.active.color))
+    return color
+# ~ ~ ~
 
 def changeColor():
     frame = getActiveFrame()
@@ -817,6 +1204,7 @@ def pasteToNewLayer():
             #createPoint(newStroke, j, points[j].co)
 '''
 
+# TODO handle multiple materials on one mesh
 def searchMtl(color=None, name="crv"):
     returns = []
     if not color:
@@ -834,6 +1222,7 @@ def compareTuple(t1, t2, numPlaces=5):
     else:
         return False
 
+# TODO handle multiple materials on one mesh
 def changeMtl(color=(1,1,0), searchColor=None, name="crv"):
     if not searchColor:
         searchColor = getActiveColor().color       
@@ -842,12 +1231,71 @@ def changeMtl(color=(1,1,0), searchColor=None, name="crv"):
     for curve in curves:
         curve.data.materials[0].diffuse_color = color
 
-def consolidateMtl(name="crv"):
+def consolidateMtl():
+    palette = getActivePalette()
+    for color in palette.colors:
+        matchMat = None
+        for obj in bpy.context.scene.objects:
+            #print(obj.name)
+            try:
+                for i, mat in enumerate(obj.data.materials):
+                    #print(str(color.color) + " " + str(getDiffuseColor(mat)))
+                    if (compareTuple((color.color[0],color.color[1],color.color[2]), getDiffuseColor(mat)) == True):
+                        if (matchMat == None):
+                            matchMat = mat
+                        else:
+                            obj.data.materials[i] = matchMat
+            except:
+                pass
+
+# old version, can't handle multiple materials on one mesh
+def consolidateMtlAlt(name="crv"):
     palette = getActivePalette()
     for color in palette.colors:
         curves = searchMtl(color=color.color, name=name)
         for i in range(1, len(curves)):
             curves[i].data.materials[0] = curves[0].data.materials[0]
+
+def getActiveMtl():
+    return bpy.context.scene.objects.active.data.materials[bpy.context.scene.objects.active.active_material_index]
+
+def getMtlColor(node="Diffuse BSDF", mtl=None):
+    if not mtl:
+        mtl = getActiveMtl()
+    try:
+        colorRaw = mtl.node_tree.nodes[node].inputs["Color"].default_value
+        color = (colorRaw[0], colorRaw[1], colorRaw[2])
+        return color
+    except:
+        return None
+
+def getEmissionColor(mtl=None):
+    if not mtl:
+        mtl = getActiveMtl()
+    return getMtlColor("Emission", mtl)
+
+def getDiffuseColor(mtl=None):
+    if not mtl:
+        mtl = getActiveMtl()
+    col = getMtlColor("Diffuse BSDF", mtl)
+    if (col==None):
+        col = mtl.diffuse_color
+    return col
+    #return getMtlColor("Diffuse BSDF", mtl)
+
+def makeEmissionMtl():
+    mtl = getActiveMtl()
+    color = getEmissionColor()
+    #print("source color: " + str(color))
+    for obj in bpy.context.scene.objects:
+        try:
+            for j in range(0, len(obj.data.materials)):
+                destColor = getDiffuseColor(obj.data.materials[j])
+                #print("dest color: " + str(destColor))
+                if (compareTuple(destColor, color) == True):
+                    obj.data.materials[j] = mtl
+        except:
+            pass
 
 def deleteFromAllFrames():
     origStrokes = []
@@ -932,6 +1380,46 @@ def getAllStrokes(active=False):
     print("Got " + str(len(returns)) + " strokes.")
     return returns
 
+def getLayerStrokes(name=None):
+    gp = getActiveGp()
+    if not name:
+        name = gp.layers.active.info
+    layer = gp.layers[name]
+    strokes = []
+    for frame in layer.frames:
+        for stroke in frame.strokes:
+            strokes.append(stroke)
+    return strokes
+
+def getFrameStrokes(num=None, name=None):
+    gp = getActiveGp()
+    if not name:
+        name = gp.layers.active.info
+    layer = gp.layers[name]
+    if not num:
+        num = layer.active_frame.frame_number
+    strokes = []
+    for frame in layer.frames:
+        if (frame.frame_number == num):
+            for stroke in frame.strokes:
+                strokes.append(stroke)
+    return strokes
+
+def getLayerStrokesAvg(name=None):
+    gp = getActiveGp()
+    if not name:
+        name = gp.layers.active.info
+    layer = gp.layers[name]
+    return float(roundVal(len(getLayerStrokes(name)) / len(layer.frames), 2))
+
+def getAllStrokesAvg(locked=True):
+    gp = getActiveGp()
+    avg = 0
+    for layer in gp.layers:
+        if (layer.lock == False or locked == True):
+            avg += getLayerStrokesAvg(layer.info)
+    return float(roundVal(avg / len(gp.layers), 2))
+
 def getSelectedStrokes(active=True):
     returns = []
     strokes = getAllStrokes(active)
@@ -1011,6 +1499,8 @@ s = select
 d = delete
 j = joinObjects
 df = deleteFromAllFrames
+spl = splitLayer
+cplf = checkLayersAboveFrameLimit
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -1199,14 +1689,89 @@ def readBrushStrokes(filepath=None):
                         x = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["co"][0]
                         y = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["co"][2]
                         z = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["co"][1]
-                    pressure = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["pressure"]
-                    strength = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["strength"]
+                    #~
+                    if ("pressure" in data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]):
+                        pressure = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["pressure"]
+                    if ("strength" in data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]):
+                        strength = data["grease_pencil"][0]["layers"][h]["frames"][i]["strokes"][j]["points"][l]["strength"]
                     #stroke.points[l].co = (x, y, z)
                     createPoint(stroke, l, (x, y, z), pressure, strength)
     #~                
     return {'FINISHED'}
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+#def writeSvg(strokes=None, name="test.svg", minLineWidth=3, camera=None):
+def writeSvg(name="test.svg", minLineWidth=3, camera=None):
+    #if not strokes:
+        #strokes = getActiveFrame().strokes
+    if not camera:
+        camera = getActiveCamera()
+    gp = getActiveGp()
+    url = getFilePath() + name
+    print(url)
+    sW = getSceneResolution()[0]
+    sH = getSceneResolution()[1]
+    svg = []
+    #~
+    # HEADER
+    svg.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>" + "\r");
+    svg.append("<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">" + "\r")
+    svg.append("<svg version=\"1.1\" id=\"Layer_1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" x=\"0px\" y=\"0px\"" + "\r")
+    svg.append("\t" + "width=\"" + str(sW) + "px\" height=\"" + str(sH) + "px\" viewBox=\"0 0 " + str(sW) + " " + str(sH) + "\" enable-background=\"new 0 0 " + str(sW) + " " + str(sH) +"\" xml:space=\"preserve\">" + "\r")
+    #~
+    # BODY
+    for layer in gp.layers:
+        svg.append("\t" + "<g id=\"" + layer.info + "\">" + "\r")
+        for i, frame in enumerate(layer.frames):
+            svg.append("\t\t" + "<g id=\"frame" + str(i) + "\">" + "\r")
+            palette = getActivePalette()
+            for stroke in frame.strokes:
+                width = stroke.line_width
+                if (width == None or width < minLineWidth):
+                    width = minLineWidth
+                #cStroke = (0,0,0,1)
+                #cFill = (1,1,1,0)
+                #try:
+                color = palette.colors[stroke.colorname]
+                print("found color: " + color.name)
+                cStroke = (color.color[0], color.color[1], color.color[2], color.alpha)
+                cFill = (color.fill_color[0], color.fill_color[1], color.fill_color[2], color.fill_alpha)
+                #except:
+                    #print("color error")
+                    #pass
+                svg.append("\t\t\t" + svgStroke(points=stroke.points, stroke=(cStroke[0], cStroke[1], cStroke[2]), fill=(cFill[0], cFill[1], cFill[2]), strokeWidth=minLineWidth, strokeOpacity=cStroke[3], fillOpacity=cFill[3], camera=camera) + "\r")
+            svg.append("\t\t\t" + svgAnimate(frame=i, fps=12.0, duration=float(len(layer.frames))/12.0) + "\r")
+            svg.append("\t\t" + "</g>" + "\r")
+        svg.append("\t" + "</g>" + "\r")
+    #~
+    # FOOTER
+    svg.append("</svg>" + "\r")
+    #~
+    writeTextFile(url, svg)
+
+def svgAnimate(frame=0, fps=12, duration=10):
+    keyIn = (float(frame) / float(fps)) / float(duration)
+    keyOut = keyIn + (1.0/float(fps))
+    returns = "<animate attributeName=\"display\" values=\"none;inline;none;none\" keyTimes=\"0;" + str(keyIn) + ";" + str(keyOut) + ";1\" dur=\"" + str(duration) + "s\" begin=\"0s\" repeatCount=\"indefinite\"/>"
+    return returns
+
+def svgStroke(points=None, stroke=(0,0,1), fill=(1,0,0), strokeWidth=2.0, strokeOpacity=1.0, fillOpacity=1.0, camera=None, closed=False):
+    # https://developer.mozilla.org/en-US/docs/Web/SVG/Element/path
+    returns = "<path stroke=\""+ normRgbToHex(stroke) + "\" fill=\""+ normRgbToHex(fill) + "\" stroke-width=\"" + str(strokeWidth) + "\" stroke-opacity=\"" + str(strokeOpacity) + "\" fill-opacity=\"" + str(fillOpacity) + "\" d=\""
+    for i, point in enumerate(points):
+        co = getWorldCoords(co=point.co, camera=camera)
+        if (i == 0):
+            returns += "M" + str(co[0]) + " " + str(co[1]) + " "
+        elif (i > 0 and i < len(points)-1):
+            returns += "L" + str(co[0]) + " " + str(co[1]) + " "
+        elif (i == len(points)-1):
+            if (closed==True):
+                returns += "L" + str(co[0]) + " " + str(co[1]) + " z"
+            else:
+                returns += "L" + str(co[0]) + " " + str(co[1])
+    returns += "\"/>"
+    return returns
 
 # shortcuts
 
@@ -1234,9 +1799,20 @@ Going back to parenting with baking for single objects, less elegant but seems t
 # http://blender.stackexchange.com/questions/6750/poly-bezier-curve-from-a-list-of-coordinates
 # http://blender.stackexchange.com/questions/7047/apply-transforms-to-linked-objects
 
-def exportForUnity():
+# http://blender.stackexchange.com/questions/17738/how-to-uv-unwrap-object-with-python
+def planarUvProject():
+    for area in bpy.context.screen.areas:
+        if area.type == 'VIEW_3D':
+            for region in area.regions:
+                if region.type == 'WINDOW':
+                    override = {'area': area, 'region': region, 'edit_object': bpy.context.edit_object}
+                    bpy.ops.uv.smart_project(override)
+                    
+def exportForUnity(sketchFab=True):
     start, end = getStartEnd()
     target = matchName("crv")
+    sketchFabList = []
+    sketchFabListNum = []
     for tt in range(0, len(target)):
         deselect()
         for i in range(start, end):
@@ -1249,9 +1825,32 @@ def exportForUnity():
                 exportName = exportName.split("crv_")[1]
                 exportName = exportName.split("_mesh")[0]
                 exporter(manualSelect=True, fileType="fbx", name=exportName)
+                sketchFabList.append("0.083 " + exportName + ".fbx" + "\r")
+                sketchFabListNum.append(float(exportName.split("_")[len(exportName.split("_"))-1]))
                 break
+    if (sketchFab==True):
+        #sketchFabList.reverse()
+        #~
+        print("before sort: ")
+        print(sketchFabList)
+        print(sketchFabListNum)
+        # this sorts entries by number instead of order in Outliner pane
+        sketchFabList.sort(key=lambda x: x[0])
+        ind = [i[0] for i in sorted(enumerate(sketchFabListNum),key=lambda x: x[1])]
+        sketchFabList = [i[0] for i in sorted(zip(sketchFabList, ind),key=lambda x: x[1])]
+        #~
+        print(getFilePath() + getFileName())
+        tempName = exportName.split("_")
+        tempString = ""
+        for i in range(0, len(tempName)-1):
+            tempString += str(tempName[i])
+            if (i < len(tempName)-1):
+                tempString += "_"
+        print("after sort: ")
+        print(sketchFabList)
+        writeTextFile(getFilePath() + getFileName() + "_" + tempString + ".sketchfab.timeframe", sketchFabList)
 
-def assembleMesh(export=False):
+def assembleMesh(export=False, createPalette=True):
     origFileName = getFileName()
     masterUrlList = []
     masterGroupList = []
@@ -1264,8 +1863,9 @@ def assembleMesh(export=False):
     #~
     for b in range(0, len(pencil.layers)):
         layer = pencil.layers[b]
-        url = origFileName + "_layer" + str(b+1) + "_" + layer.info
-        masterGroupList.append(layer.info)
+        #url = origFileName + "_layer" + str(b+1) + "_" + layer.info
+        url = origFileName + "_layer_" + layer.info
+        masterGroupList.append(getLayerInfo(layer))
         masterUrlList.append(url)
     #~
     #openFile(origFileName)
@@ -1280,6 +1880,12 @@ def assembleMesh(export=False):
         except:
             readyToSave = False
             print("Error importing group " + masterGroupList[i] + ", " + str(i+1) + " of " + str(len(masterGroupList)))
+    #~
+    if (createPalette==True):
+        createMtlPalette()
+    #~
+    consolidateGroups()
+    #~
     if (readyToSave==True):
         if (export==True):
             exportForUnity()
@@ -1295,7 +1901,7 @@ def assembleMesh(export=False):
             saveFile(origFileName + "_ASSEMBLY")
             print(origFileName + "_ASSEMBLY.blend" + " was saved but some groups were missing.")
 
-def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=True, _animateFrames=True, _solidify=False, _subd=0, _remesh=False, _consolidateMtl=True, _caps=True, _joinMesh=True):
+def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=False, _animateFrames=True, _solidify=False, _subd=0, _remesh=False, _consolidateMtl=True, _caps=True, _joinMesh=True, _uvStroke=False, _uvFill=False):
     if (_joinMesh==True or _remesh==True):
         _bakeMesh=True
     #~
@@ -1327,7 +1933,8 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
     #~
     for b in range(0, len(pencil.layers)):
         layer = pencil.layers[b]
-        url = origFileName + "_layer" + str(b+1) + "_" + layer.info
+        #url = origFileName + "_layer" + str(b+1) + "_" + layer.info
+        url = origFileName + "_layer_" + layer.info
         if (layer.lock==False):
             rangeStart = 0
             rangeEnd = len(layer.frames)
@@ -1348,6 +1955,7 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
                     #~
                     stroke_points = stroke.points
                     coords = [ (point.co.x, point.co.y, point.co.z) for point in stroke_points ]
+                    pressures = [ point.pressure for point in stroke_points ]
                     '''
                     coords = []
                     if (_minDistance > 0.0):
@@ -1358,14 +1966,25 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
                         coords = coordsOrig
                     '''
                     #~
-                    crv_ob = makeCurve(name="crv_" + layer.info + "_" + str(layer.frames[c].frame_number), coords=coords, curveType=_curveType, resolution=_resolution, thickness=_thickness, bevelResolution=_bevelResolution, parent=layer.parent, capsObj=capsObj)
+                    crv_ob = makeCurve(name="crv_" + getLayerInfo(layer) + "_" + str(layer.frames[c].frame_number), coords=coords, pressures=pressures, curveType=_curveType, resolution=_resolution, thickness=_thickness, bevelResolution=_bevelResolution, parent=layer.parent, capsObj=capsObj, useUvs=_uvStroke)
                     strokeColor = (0.5,0.5,0.5)
                     if (_useColors==True):
                         strokeColor = palette.colors[stroke.colorname].color
-                    mat = bpy.data.materials.new("new_mtl")
+                    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+                    mat = None
+                    if (_consolidateMtl==False):
+                       mat = bpy.data.materials.new("new_mtl")
+                       mat.diffuse_color = strokeColor
+                    else:
+                        for oldMat in bpy.data.materials:
+                            if (compareTuple(strokeColor, oldMat.diffuse_color) == True):
+                                mat = oldMat
+                                break
+                        if (mat == None):
+                            mat = bpy.data.materials.new("share_mtl")
+                            mat.diffuse_color = strokeColor  
                     crv_ob.data.materials.append(mat)
-                    crv_ob.data.materials[0].diffuse_color = strokeColor
-                    # TODO can you store vertex colors in a curve?
+                    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
                     #~   
                     bpy.context.scene.objects.active = crv_ob
                     #~
@@ -1395,7 +2014,7 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
                         #~
                         # + + + + + + +
                         if (palette.colors[stroke.colorname].fill_alpha > 0.001):
-                            fill_ob = createFill(stroke.points)
+                            fill_ob = createFill(stroke.points, useUvs=_uvFill)
                             joinObjects([meshObj, fill_ob])
                         # + + + + + + +
                         #~
@@ -1426,11 +2045,12 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
                             elif (c != len(layer.frames)-1):
                                 hideFrame(frameList[i], j, True)
                 #~
-                if (_consolidateMtl==True):
-                    consolidateMtl()
+                #if (_consolidateMtl==True):
+                    #consolidateMtl()
                 #~
                 if (_joinMesh==True): #and _bakeMesh==True):
-                    target = matchName("crv")
+                    #target = matchName("crv")
+                    target = matchName("crv_" + getLayerInfo(layer))
                     for i in range(start, end):
                         strokesToJoin = []
                         if (i == layer.frames[c].frame_number):
@@ -1456,23 +2076,36 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
             #~
             if (_saveLayers==True):
                 deselect()
-                target = matchName("crv")
+                #target = matchName("crv")
+                target = matchName("crv_" + getLayerInfo(layer))
                 for tt in range(0, len(target)):
                     target[tt].select = True
                 print("* baking")
-                bakeParentToChild(start, end)
+                # ~ ~ new ~ ~ 
+                '''
+                for obj in target:
+                    bpy.context.scene.objects.active = obj
+                    #print(bpy.context.scene.objects.active.name)
+                    bakeParentToChild(start, end)
+                '''
+                # ~ ~ ~ ~ ~ ~
+                # * * * * *
+                #bakeParentToChild(start, end)
+                # * * * * *
+                bakeParentToChildByName("crv_" + getLayerInfo(layer))
+                # * * * * *
                 print("~ ~ ~ ~ ~ ~ ~ ~ ~")
                 #~
-                makeGroup(layer.info)
+                makeGroup(getLayerInfo(layer))
                 #~
-                masterGroupList.append(layer.info)
+                masterGroupList.append(getLayerInfo(layer))
                 #~
                 print("saving to " + url)
                 saveFile(url)
                 #~
                 masterUrlList.append(url)
                 #~
-                gpMeshCleanup(layer.info)
+                gpMeshCleanup(getLayerInfo(layer))
     #~
     if (_bakeMesh==True and _caps==True and _saveLayers==False):
         delete(capsObj)
@@ -1482,7 +2115,15 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
         for i in range(0, len(masterUrlList)):
             importGroup(getFilePath() + masterUrlList[i] + ".blend", masterGroupList[i], winDir=True)
         #~
+        if (_consolidateMtl==True):
+            createMtlPalette()
+        #~
+        consolidateGroups()
+        #~
         saveFile(origFileName + "_ASSEMBLY")
+
+def getLayerInfo(layer):
+    return layer.info.split(".")[0]
 
 def gpMeshCleanup(target):
     gc.collect()
@@ -1511,6 +2152,26 @@ def remesher(obj, bake=True, mode="blocks", octree=6, threshold=0.0001, smoothSh
             return applyModifiers(obj)     
         else:
             return obj
+
+# https://blender.stackexchange.com/questions/45004/how-to-make-boolean-modifiers-with-python
+def booleanMod(target=None, op="union"):
+    if not target:
+        target=s()
+    for i in range(1, len(target)):
+            bpy.context.scene.objects.active = target[i]
+            bpy.ops.object.modifier_add(type="BOOLEAN")
+            bpy.context.object.modifiers["Boolean"].operation = op.upper()
+            bpy.context.object.modifiers["Boolean"].object = target[i-1]
+            bpy.ops.object.modifier_apply(apply_as='DATA', modifier="Boolean")
+            delete(target[i-1])
+
+def polyCube(pos=(0,0,0), scale=(1,1,1), rot=(0,0,0)):
+    bpy.ops.mesh.primitive_cube_add()
+    cube = s()[0]
+    cube.location = pos
+    cube.scale=scale
+    cube.rotation_euler=rot
+    return cube
 
 def applyModifiers(obj):
     mesh = obj.to_mesh(scene = bpy.context.scene, apply_modifiers=True, settings = 'PREVIEW')
@@ -1643,7 +2304,7 @@ def matchWithParent(_child, _parent, _index):
         _child.parent = _parent
         keyTransform(_child, _index)   
 
-def makeCurve(coords, resolution=2, thickness=0.1, bevelResolution=1, curveType="bezier", parent=None, capsObj=None, name="crv_ob"):
+def makeCurve(coords, pressures, resolution=2, thickness=0.1, bevelResolution=1, curveType="bezier", parent=None, capsObj=None, name="crv_ob", useUvs=True):
     # http://blender.stackexchange.com/questions/12201/bezier-spline-with-python-adds-unwanted-point
     # http://blender.stackexchange.com/questions/6750/poly-bezier-curve-from-a-list-of-coordinates
     # create the curve datablock
@@ -1685,13 +2346,17 @@ def makeCurve(coords, resolution=2, thickness=0.1, bevelResolution=1, curveType=
     if (curveType=="NURBS"):
         polyline.points.add(len(coords)-1)
         for i, coord in enumerate(coords):
-                x,y,z = coord
-                polyline.points[i].co = (x, y, z, 1)    
+            x,y,z = coord
+            polyline.points[i].co = (x, y, z, 1) 
+            if (pressures != None):
+                polyline.points[i].radius = pressures[i]   
     elif (curveType=="BEZIER"):
         polyline.bezier_points.add(len(coords)-1)
         #polyline.bezier_points.foreach_set("co", unpack_list(coords))
         for i, coord in enumerate(coords):
             polyline.bezier_points[i].co = coord   
+            if (pressures != None):
+                polyline.bezier_points[i].radius = pressures[i]  
             polyline.bezier_points[i].handle_left = polyline.bezier_points[i].handle_right = polyline.bezier_points[i].co
     #~
     # create object
@@ -1704,6 +2369,8 @@ def makeCurve(coords, resolution=2, thickness=0.1, bevelResolution=1, curveType=
     scn.objects.link(crv_ob)
     scn.objects.active = crv_ob
     crv_ob.select = True
+    if (useUvs==True):
+        crv_ob.data.use_uv_as_generated = True
     return crv_ob
 
 '''
@@ -1788,6 +2455,15 @@ def makeGpCurve(_type="PATH"):
     #bpy.context.area.type = "CONSOLE"
     bpy.context.area.type = original_type
 
+def cubesToVerts(target=None, cubeScale=0.25, posScale=0.01):
+    if not target:
+        target = s()[0].data.vertices
+    for vert in target:
+        bpy.ops.mesh.primitive_cube_add()
+        cube = s()[0]
+        cube.location = vert.co * posScale
+        cube.scale = (cubeScale,cubeScale,cubeScale)
+
 def randomMetaballs():
     # http://blenderscripting.blogspot.com/2012/09/tripping-metaballs-python.html
     scene = bpy.context.scene
@@ -1806,7 +2482,7 @@ def randomMetaballs():
         element.co = coordinate
         element.radius = 2.0
 
-def createFill(inputVerts):
+def createFill(inputVerts, useUvs=False):
     verts = []
     #~
     # Create mesh 
@@ -1859,6 +2535,11 @@ def createFill(inputVerts):
     # Finish up, write the bmesh back to the mesh
     bm.to_mesh(me)
     #~
+    if (useUvs==True):
+        ob.select = True
+        bpy.context.scene.objects.active = ob
+        planarUvProject()
+    #~
     return ob
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
@@ -1872,6 +2553,9 @@ def gp():
     dn()
     gpMeshPreview()
 
+def gs():
+    gpMesh(_singleFrame=True)
+	
 def gb():
     dn()
     gpMesh(_bakeMesh=True)
