@@ -604,7 +604,9 @@ def delete(_obj, clearMemory=False):
     #print("Deleted " + _obj.name)  
 '''
 
-def delete(_obj):
+def delete(_obj=None):
+    if not _obj:
+        _obj = ss()
     #oldMode = bpy.context.mode
     #bpy.ops.object.mode_set(mode='OBJECT')
     bpy.ops.object.select_all(action='DESELECT')
@@ -616,6 +618,12 @@ def delete(_obj):
 def refresh():
     bpy.context.scene.update()
 
+def remap(value, min1, max1, min2, max2):
+    range1 = max1 - min1
+    range2 = max2 - min2
+    valueScaled = float(value - min1) / float(range1)
+    return min2 + (valueScaled * range2)
+    
 def matchName(_name):
     returns = []
     for i in range(0, len(bpy.context.scene.objects)):
@@ -1722,7 +1730,13 @@ def writeSvg(filepath=None):
                     #print("color error")
                     #pass
                 svg.append("\t\t\t" + svgStroke(points=stroke.points, stroke=(cStroke[0], cStroke[1], cStroke[2]), fill=(cFill[0], cFill[1], cFill[2]), strokeWidth=minLineWidth, strokeOpacity=cStroke[3], fillOpacity=cFill[3], camera=camera) + "\r")
-            svg.append("\t\t\t" + svgAnimate(frame=frame.frame_number, fps=fps, duration=duration, idTag="anim_" + layerInfo + "_frame" + str(i)) + "\r")
+            #~
+            idTagBase = "anim_" + layerInfo + "_frame"
+            idTag = idTagBase + str(i)
+            prevIdTag = "0s"
+            if (i>0):
+                prevIdTag = idTagBase + str(i-1) + ".end"
+            svg.append("\t\t\t" + svgAnimate(frame=frame.frame_number, fps=fps, duration=duration, idTag=idTag, prevIdTag=prevIdTag) + "\r")
             svg.append("\t\t" + "</g>" + "\r")
         svg.append("\t" + "</g>" + "\r")
     #~
@@ -1731,7 +1745,7 @@ def writeSvg(filepath=None):
     #~
     writeTextFile(url, svg)
 
-def svgAnimate(frame=0, fps=12, duration=10, idTag=None):
+def svgAnimate(frame=0, fps=12, duration=10, idTag=None, prevIdTag=None):
     keyIn = (float(frame) / float(fps)) / float(duration)
     keyOut = keyIn + (1.0/float(fps))
     returns = "<animate id=\"" + str(idTag) + "\" attributeName=\"display\" values=\"none;inline;none;none\" keyTimes=\"0;" + str(keyIn) + ";" + str(keyOut) + ";1\" dur=\"" + str(duration) + "s\" begin=\"0s\" repeatCount=\"indefinite\"/>"
@@ -1756,9 +1770,96 @@ def svgStroke(points=None, stroke=(0,0,1), fill=(1,0,0), strokeWidth=2.0, stroke
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
+def writePainter(filepath=None):
+    camera=getActiveCamera()
+    outputFile = []
+    dim = (float(getSceneResolution()[0]), float(getSceneResolution()[1]), 0.0)
+    outputFile.append(painterHeader(dim))
+    #~
+    strokes = []
+    gp = getActiveGp()
+    palette = getActivePalette()
+    for layer in gp.layers:
+        if (layer.lock == False):
+            for stroke in layer.active_frame.strokes:
+                strokes.append(stroke)
+    counter = 0
+    for stroke in strokes:
+        color = palette.colors[stroke.color.name].color
+        points = []
+        for point in stroke.points: 
+            co = getWorldCoords(co=point.co, camera=camera)
+            x = co[0] 
+            y = co[1]
+            prs = point.pressure
+            point = (x, y, prs, counter)
+            counter += 1
+            points.append(point)
+        outputFile.append(painterStroke(points, color))
+    #~
+    outputFile.append(painterFooter())
+    writeTextFile(filepath, outputFile)
+
+def painterHeader(dim=(1024,1024,1024), bgColor=(1,1,1)):
+    s = "script_version_number version 10" + "\r"
+    s += "artist_name \"\"" + "\r"
+    s += "start_time date Wed, May 24, 2017 time 3:23 PM" + "\r"
+    s += "start_random 1366653360 1884255589" + "\r"
+    #s += "variant \"Painter Brushes\" \"F-X\" \"Big Wet Luscious\"" + "\r"
+    #s += "max_size_slider   14.00000" + "\r"
+    #s += "min_radius_fraction_slider    0.20599" + "\r"
+    s += "build" + "\r"
+    s += "penetration_slider 100 percent" + "\r"
+    #s += "texture \"Paper Textures\" \"<str t=17500 i=001>\"" + "\r"
+    s += "grain_inverted unchecked" + "\r"
+    s += "directional_grain unchecked" + "\r"
+    s += "scale_slider 1.00000" + "\r"
+    s += "paper_brightness_slider 0.50000" + "\r"
+    s += "paper_contrast_slider 1.00000" + "\r"
+    s += "portfolio_change \"\"" + "\r"
+    #s += "gradation \"Painter Gradients.gradients\" \"<str t=17503 i=001>\"" + "\r"
+    #s += "weaving \"Painter Weaves.weaves\" \"<str t=17504 i=001>\"" + "\r"
+    #s += "pattern_change \"Painter Patterns\" \"<str t=17001 i=001>\"" + "\r"
+    #s += "path_library_change \"Painter Selections\"" + "\r"
+    #s += "nozzle_change \"Painter Nozzles\" \"<str t=17000 i=001>\"" + "\r"
+    s += "use_brush_grid unchecked" + "\r"
+    s += "new_tool 1" + "\r"
+    s += "gradation_options type 0 order 0 angle 0.00 spirality  1.000" + "\r"
+    s += "pattern_options pattern_type 1 offset 0.594" + "\r"
+    s += "preserve_transparency unchecked" + "\r"
+    s += "wind_direction 4.712389" + "\r"
+    #s += "color red 1 green 109 blue 255" + "\r"
+    #s += "background_color red 255 green 4 blue 4" + "\r"
+    #s += "change_file \"ntitled-1\"" + "\r"
+    s += "new_3 \"Untitled-1\" width " + str(int(dim[0])) + " height " + str(int(dim[1])) + " resolution 72.00000 width_unit 1 height_unit 1 resolution_unit 1 paper_color red " + str(int(bgColor[0] * 255.0)) + " green " + str(int(bgColor[1] * 255.0)) + " blue " + str(int(bgColor[2] * 255.0)) + " movie 0 frames 1" + "\r"
+    return s
+
+def painterFooter():
+    s = "end_time date Wed, May 24, 2017 time 3:25 PM" + "\r"
+    return s
+
+def painterStroke(points, color=(0,0,0)):
+    s = "color red " + str(int(color[0]*255.0)) + " green " + str(int(color[1]*255.0)) + " blue " + str(int(color[2]*255.0)) + "\r"
+    s += "stroke_start" + "\r"
+    for point in points:
+        s += painterPoint(point)
+    s += "stroke_end" + "\r"
+    return s
+
+def painterPoint(point):
+    x = point[0]
+    y = point[1]
+    time = point[3]
+    s = "pnt x " + str(x) + " y " + str(y) + " time " + str(time) + " prs " + str(roundVal(point[2], 2)) + " tlt 0.00 brg 0.00 whl 1.00 rot 0.00" + "\r"
+    return s
+
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
 #def gmlParser(filepath=None, globalScale=(0.1,0.1,0.1), useTime=True):
 def gmlParser(filepath=None, splitStrokes=True):
-    globalScale = (0.1, 0.1, 0.1)
+    globalScale = (1, 1, 1)
+    screenBounds = (1, 1, 1)
+    up = (0, 1, 0)
     useTime = True
     minStrokeLength=3
     #splitStrokes = True
@@ -1779,31 +1880,32 @@ def gmlParser(filepath=None, splitStrokes=True):
     start, end = getStartEnd()
     #~
     tag = root.find("tag")
-    yUp = False
     origLayerName = "GML_Tag"
     layer = newLayer(origLayerName)
     masterLayerList.append(layer)
     #~
     header = tag.find("header")
-    if header:
-        pass
+    #if header:
+        #pass
     #~
-    environment = tag.find("environment")
+    environment = header.find("environment")
+    if not environment:
+        environment = tag.find("environment")
     if environment:
         upEl = environment.find("up")
-        up = (float(upEl.find("x").text), float(upEl.find("y").text), float(upEl.find("z").text))
-        if (up[1] > 0):
-            yUp = True
+        if (upEl):
+        	up = (float(upEl.find("x").text), float(upEl.find("y").text), float(upEl.find("z").text))
         screenBoundsEl = environment.find("screenBounds")
-        sbX = float(screenBoundsEl.find("x").text)
-        sbY = float(screenBoundsEl.find("y").text)
-        sbZ = 1.0
-        try:
-            sbZ = float(screenBoundsEl.find("z").text)
-        except:
-            pass
-        screenBounds = (sbX, sbY, sbZ)
-        globalScale = (globalScale[0] * screenBounds[0], globalScale[1] * screenBounds[1], globalScale[2] * screenBounds[2])
+        if (screenBoundsEl):
+            sbX = float(screenBoundsEl.find("x").text)
+            sbY = float(screenBoundsEl.find("y").text)
+            sbZ = 1.0
+            try:
+            	sbZ = float(screenBoundsEl.find("z").text)
+            except:
+            	pass
+            screenBounds = (sbX, sbY, sbZ)
+    globalScale = (globalScale[0] * screenBounds[0], globalScale[1] * screenBounds[1], globalScale[2] * screenBounds[2])
     #~
     drawing = tag.find("drawing")
     strokesEl = drawing.findall("stroke")
@@ -1823,8 +1925,12 @@ def gmlParser(filepath=None, splitStrokes=True):
             try:
                 z = float(pt.find("z").text) * globalScale[2]
             except:
-                pass
-            time = float(pt.find("time").text)
+            	pass
+            time = 0.0
+            try:
+            	time = float(pt.find("time").text)
+            except:
+            	pass
             #if (yUp==False):
             gmlPoints.append((x,y,z,time))
             #else:
@@ -1869,7 +1975,7 @@ def gmlParser(filepath=None, splitStrokes=True):
         cleanCounter = 1
         for layer in masterLayerList:
             for gpLayer in gp.layers:
-                if (layer.info == gpLayer.info):
+                if (layer.info==gpLayer.info):
                     gpLayer.info = origLayerName + "_" + str(cleanCounter)
                     cleanCounter += 1
                     break
@@ -2444,6 +2550,20 @@ def remesher(obj, bake=True, mode="blocks", octree=6, threshold=0.0001, smoothSh
             return applyModifiers(obj)     
         else:
             return obj
+
+# context error
+def decimator(target=None, ratio=0.1, bake=True):
+    if not target:
+        target = ss()
+    bpy.context.scene.objects.active = target
+    #ctx = fixContext
+    bpy.ops.object.modifier_add(type='DECIMATE')
+    #restoreContext(ctx)
+    bpy.context.object.modifiers["Decimate"].ratio = ratio     
+    if (bake == True):
+        return applyModifiers(target)
+    else:
+        return target
 
 # https://blender.stackexchange.com/questions/45004/how-to-make-boolean-modifiers-with-python
 def booleanMod(target=None, op="union"):
@@ -3045,6 +3165,34 @@ class ExportSvg(bpy.types.Operator, ExportHelper):
         la.writeSvg(**keywords)
         return {'FINISHED'} 
 
+class ExportPainter(bpy.types.Operator, ExportHelper):
+    """Save an SVG SMIL File"""
+
+    bl_idname = "export_scene.painter"
+    bl_label = 'Export Painter'
+    bl_options = {'PRESET'}
+
+    filename_ext = ".txt"
+    filter_glob = StringProperty(
+            default="*.txt",
+            options={'HIDDEN'},
+            )
+
+    #bake = BoolProperty(name="Bake Frames", description="Bake Keyframes to All Frames", default=True)
+
+    def execute(self, context):
+        import latk as la
+        #keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob", "split_mode", "check_existing", "bake"))
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob", "split_mode", "check_existing"))
+        if bpy.data.is_saved and context.user_preferences.filepaths.use_relative_paths:
+            import os
+            #keywords["relpath"] = os.path.dirname(bpy.data.filepath)
+        #~
+        #keywords["bake"] = self.bake
+        #~
+        la.writePainter(**keywords)
+        return {'FINISHED'} 
+
 def menu_func_import(self, context):
     self.layout.operator(ImportLatk.bl_idname, text="Latk Animation (.json)")
     self.layout.operator(ImportGml.bl_idname, text="Graffiti Markup Language (.gml)")
@@ -3053,6 +3201,7 @@ def menu_func_import(self, context):
 def menu_func_export(self, context):
     self.layout.operator(ExportLatk.bl_idname, text="Latk Animation (.json)")
     self.layout.operator(ExportSvg.bl_idname, text="SVG SMIL Animation (.svg)")
+    self.layout.operator(ExportPainter.bl_idname, text="Corel Painter Script (.txt)")
 
 
 def register():
