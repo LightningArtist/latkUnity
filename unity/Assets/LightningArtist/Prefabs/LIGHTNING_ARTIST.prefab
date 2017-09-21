@@ -9,6 +9,9 @@ GameObject:
   m_Component:
   - component: {fileID: 407312}
   - component: {fileID: 11437508}
+  - component: {fileID: 114160889968000614}
+  - component: {fileID: 114569288820653972}
+  - component: {fileID: 114662307838252072}
   m_Layer: 0
   m_Name: LIGHTNING_ARTIST
   m_TagString: Untagged
@@ -41,27 +44,35 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   brushMode: 0
+  brushMat:
+  - {fileID: 2100000, guid: 7ff5f226683f27a4f8e5be4f5a466cba, type: 2}
+  - {fileID: 2100000, guid: 20f8c860059c3cf4c80536b089551ae8, type: 2}
   target: {fileID: 0}
-  layerPrefab: {fileID: 1026832212185730, guid: a3f692cf9448fdf4dbc65e783fad83d1,
+  layerPrefab: {fileID: 114288204717375812, guid: a3f692cf9448fdf4dbc65e783fad83d1,
     type: 2}
-  brushPrefab: {fileID: 120844, guid: beb8a1e04a58a4494ae8870cdc802e88, type: 2}
-  framePrefab: {fileID: 101456, guid: a15481ca94e650549a5cb0e614ef8fe2, type: 2}
+  framePrefab: {fileID: 11408600, guid: a15481ca94e650549a5cb0e614ef8fe2, type: 2}
+  brushPrefab: {fileID: 11487128, guid: beb8a1e04a58a4494ae8870cdc802e88, type: 2}
   textMesh: {fileID: 0}
   audio: {fileID: 0}
   animator: {fileID: 0}
   floorRen: {fileID: 0}
   mainColor: {r: 0.3455882, g: 0.59381324, b: 1, a: 1}
+  endColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  useEndColor: 0
+  drawTrailLength: 4
+  strokeLife: 5
+  killStrokes: 0
   readFileName: current.json
-  readOnStart: 1
+  readOnStart: 0
   playOnStart: 0
   writeFileName: current.json
   useTimestamp: 1
-  createFrameWithLayer: 0
+  createFrameWithLayer: 1
   newLayerOnRead: 0
+  drawWhilePlaying: 1
   fillEmptyMethod: 2
   minDistance: 0
-  mouseMode: 0
-  brushSize: 0.1
+  brushSize: 0.05
   globalScale: {x: 10, y: 10, z: 10}
   globalOffset: {x: 0, y: 0, z: -15}
   useScaleAndOffsetRead: 0
@@ -111,3 +122,52 @@ Prefab:
   m_ParentPrefab: {fileID: 0}
   m_RootGameObject: {fileID: 119360}
   m_IsPrefabParent: 1
+--- !u!114 &114160889968000614
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 119360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb059c68342e9c54a92e7afa1d865b22, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lightningArtist: {fileID: 11437508}
+  brushInputButtons: {fileID: 0}
+  zPos: 1
+--- !u!114 &114569288820653972
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 119360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da3986eabfaf99c409de203f278c0d23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lightningArtist: {fileID: 11437508}
+--- !u!114 &114662307838252072
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 119360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9bc1afa92517564aafa1200fc799281, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lightningArtist: {fileID: 0}
+  showButtons: 1
+  LABEL_START_X: 15
+  LABEL_START_Y: 15
+  LABEL_SIZE_X: 304
+  LABEL_SIZE_Y: 35
+  LABEL_GAP_Y: 3
+  BUTTON_SIZE_X: 200
+  BUTTON_SIZE_Y: 90
+  BUTTON_GAP_X: 5
+  FLOAT_FORMAT: F3
+  FONT_SIZE: <size=25>

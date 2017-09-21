@@ -8,12 +8,12 @@ public class BrushInputMouse : MonoBehaviour {
 	public BrushInputButtons brushInputButtons;
 	public float zPos = 1f;
 
-	void Awake() {
+	private void Awake() {
 		if (lightningArtist == null) lightningArtist = GetComponent<LightningArtist>();
 		if (brushInputButtons == null) brushInputButtons = GetComponent<BrushInputButtons>();
 	}
 
-	void Update() {
+	private void Update() {
 		// draw
 		if (Input.GetMouseButton(0) && GUIUtility.hotControl == 0) {
 			Vector3 mousePos = Vector3.zero;

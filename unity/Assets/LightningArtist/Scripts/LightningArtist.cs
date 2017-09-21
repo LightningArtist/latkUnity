@@ -33,17 +33,23 @@ using SimpleJSON;
 
 public class LightningArtist : MonoBehaviour {
 
-	public enum BrushMode { ADD, ALPHA };
-	public BrushMode brushMode = BrushMode.ADD;
-	public GameObject target;
-	public GameObject layerPrefab;
-	public GameObject brushPrefab;
-	public GameObject framePrefab;
-	public TextMesh textMesh;
+    public enum BrushMode { ADD, SURFACE, UNLIT };
+    public BrushMode brushMode = BrushMode.ADD;
+    public Material[] brushMat;
+    public Transform target;
+	public BrushLayer layerPrefab;
+	public BrushFrame framePrefab;
+    public BrushStroke brushPrefab;
+    public TextMesh textMesh;
 	public AudioSource audio;
 	public Animator animator;
 	public Renderer floorRen;
 	public Color mainColor = new Color(0.5f, 0.5f, 0.5f);
+	public Color endColor = new Color(0.5f, 0.5f, 0.5f);
+	public bool useEndColor = false;
+	public int drawTrailLength = 4;
+	public float strokeLife = 5f;
+	public bool killStrokes = false;
 
 	public string readFileName = "brushstrokes-saved.json";
 	public bool readOnStart = false;
@@ -53,20 +59,20 @@ public class LightningArtist : MonoBehaviour {
 	public bool createFrameWithLayer = false;
 	public bool newLayerOnRead = false;
     public bool drawWhilePlaying = false;
+    public bool refineStrokes = false;
 
-	// NONE plays empty frames as empty. 
-	// WRITE copies last good frame into empty frame (will save out). 
-	// DISPLAY holds last good frame but doesn't copy (won't save out).
-	public enum FillEmptyMethod { NONE, WRITE, DISPLAY }; 
+    // NONE plays empty frames as empty. 
+    // WRITE copies last good frame into empty frame (will save out). 
+    // DISPLAY holds last good frame but doesn't copy (won't save out).
+    public enum FillEmptyMethod { NONE, WRITE, DISPLAY }; 
 	public FillEmptyMethod fillEmptyMethod = FillEmptyMethod.DISPLAY;
 
 	public float minDistance = 0.0001f;
-	//public bool mouseMode = false;
 	public float brushSize = 0.008f;
-	public Vector3 globalScale = new Vector3 (1f, 1f, 1f);
-	public Vector3 globalOffset = Vector3.zero;
-	public bool useScaleAndOffsetRead = true;
-	public bool useScaleAndOffsetWrite = false;
+	//public Vector3 globalScale = new Vector3 (1f, 1f, 1f);
+	//public Vector3 globalOffset = Vector3.zero;
+	//public bool useScaleAndOffsetRead = true;
+	//public bool useScaleAndOffsetWrite = false;
 	public float frameInterval = 12f;
 	public float eraseRange = 0.05f;
 	public float pushRange = 0.05f;
@@ -78,10 +84,7 @@ public class LightningArtist : MonoBehaviour {
 
 	[HideInInspector] public List<BrushLayer> layerList;
 	[HideInInspector] public int currentLayer = 0;
-	//[HideInInspector] public List<BrushFrame> frameList;
-	//[HideInInspector] public List<BrushStroke> brushStrokeList;
 	[HideInInspector] public bool isDrawing = false;
-	//[HideInInspector] public string folderName = "StreamingAssets";
 	[HideInInspector] public JSONNode jsonNode;
 	[HideInInspector] public bool clicked = false;
 	[HideInInspector] public bool isReadingFile = false;
@@ -106,28 +109,30 @@ public class LightningArtist : MonoBehaviour {
 	private float animVal = 0f;
 	private Vector3 lastTargetPos = Vector3.zero;
 
-	//private float consoleUpdateInterval = 0.00001f;
 	private float consoleUpdateInterval = 0f;
 	private int debugTextCurrentFrame = 0;
 	private int debugTextLastFrame = 0;
 	private int longestLayer = 0;
+    private float brushSizeDelta = 0f;
 
-	/*
-	private bool blockMainTriggerButton = false;
-	private bool blockMainGripButton = false;
-	private bool blockMainPadButton = false;
+    private Matrix4x4 transformMatrix;
 
-	private bool blockAltTriggerButton = false;
-	private bool blockAltGripButton = false;
-	private bool blockAltPadButton = false;
-	*/
+    public void updateTransformMatrix() {
+        transformMatrix = Matrix4x4.TRS(transform.position, transform.rotation, transform.localScale);
+    }
 
+    public Vector3 applyTransformMatrix(Vector3 p) {
+        return transformMatrix.MultiplyPoint3x4(p);
+    }
 
-	void Awake() {
+    void Awake() {
+        updateTransformMatrix();
 		if (textMesh != null) textMeshRen = textMesh.gameObject.GetComponent<Renderer>();
 	}
 
 	void Start() {
+        if (!target) target = transform;
+
 		if (floorRen != null) floorRen.enabled = false;
 
 		frameInterval = 1f / frameInterval;
@@ -138,8 +143,9 @@ public class LightningArtist : MonoBehaviour {
 
 		if (readOnStart) {
 			armReadFile = true;
-			//StartCoroutine(readBrushStrokes());
 		}
+
+        brushSizeDelta = brushSize / 100f;
 	}
 
 	void Update() {
@@ -178,6 +184,13 @@ public class LightningArtist : MonoBehaviour {
 					if (animVal > 1f) animVal = 1f;
 
 					for (int i = 0; i < layerList.Count; i++) {
+						// ~ ~ ~ ~ ~
+						if (killStrokes) {
+							if (layerList[i].frameList[layerList[i].currentFrame].brushStrokeList.Count > 0 && Time.realtimeSinceStartup > layerList[i].frameList[layerList[i].currentFrame].brushStrokeList[0].birthTime + strokeLife) {
+								inputEraseFirstStroke(); 
+							}
+						}
+						// ~ ~ ~ ~ ~
 						layerList[i].frameList[layerList[i].currentFrame].showFrame (false);
 						layerList[i].currentFrame++;
 
@@ -212,40 +225,35 @@ public class LightningArtist : MonoBehaviour {
 			// ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
 			try {
-				if (isDrawing && Vector3.Distance(lastTargetPos, target.transform.position) > minDistance) {
+				if (isDrawing && Vector3.Distance(lastTargetPos, target.position) > minDistance) {
 					buildStroke();
 				}
 			} catch (System.Exception e) {
 				Debug.Log (e.Data);
 			}
 
-			//if (Input.GetKeyDown(KeyCode.Space)) {
 			if (clicked && !isDrawing) {
 				beginStroke();
                 if (drawWhilePlaying && isPlaying && layerList[currentLayer].frameList.Count > 1 && layerList[currentLayer].frameList[layerList[currentLayer].previousFrame].brushStrokeList.Count > 0) {
                     BrushStroke lastStroke = layerList[currentLayer].frameList[layerList[currentLayer].previousFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].previousFrame].brushStrokeList.Count - 1];
-                    for (int pts = lastStroke.points.Count / 4; pts < lastStroke.points.Count - 1; pts++) {
+					for (int pts = lastStroke.points.Count / drawTrailLength; pts < lastStroke.points.Count - 1; pts++) {
                         layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].points.Add(lastStroke.points[pts]);
                     }
                 }
 			}
 
-			//if (Input.GetKeyUp(KeyCode.Space)) {
 			if (!clicked && isDrawing) {
 				endStroke();
 			}
 
-			//if (layerList.Count > 1) {
-				//textMesh.text = "" + currentLayer + ". frame " + (layerList [currentLayer].currentFrame + 1) + " / " + layerList [currentLayer].frameList.Count + " (" + (layerList [longestLayer].currentFrame + 1) + " / " + layerList [longestLayer].frameList.Count + ")";
-			//} else {
 			if (textMesh != null) textMesh.text = "frame " + (layerList [currentLayer].currentFrame + 1) + " / " + layerList [currentLayer].frameList.Count;
-			//}
-			if (layerList.Count > 1 && textMesh != null) textMesh.text = "" + (currentLayer + 1) + ". " + textMesh.text;
-			//if (currentLayer != longestLayer) textMesh.text += " (" + (layerList [longestLayer].currentFrame + 1) + " / " + layerList [longestLayer].frameList.Count + ")";
-			if (layerList[currentLayer].frameList.Count < layerList[longestLayer].frameList.Count && textMesh != null) textMesh.text += " (" + layerList [longestLayer].frameList.Count + ")";
+
+            if (layerList.Count > 1 && textMesh != null) textMesh.text = "" + (currentLayer + 1) + ". " + textMesh.text;
+
+            if (layerList[currentLayer].frameList.Count < layerList[longestLayer].frameList.Count && textMesh != null) textMesh.text += " (" + layerList [longestLayer].frameList.Count + ")";
 		}
 
-		lastTargetPos = target.transform.position;
+		lastTargetPos = target.position;
 	}
 
 	int getLongestLayer() {
@@ -259,23 +267,19 @@ public class LightningArtist : MonoBehaviour {
 	void beginStroke() {
 		if (!drawWhilePlaying) isPlaying = false;
 		isDrawing = true;
-		instantiateStroke();
+		instantiateStroke(mainColor);
 		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].setBrushColor(mainColor);
 	}
 
 	void buildStroke() {
 		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].isDirty = true;
 
-		//if (mouseMode) {
-			//Vector3 mousePos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, 1f));
-			//layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count-1].points.Add(mousePos);
-		//} else {
-		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count-1].points.Add(target.transform.position);
-		//}
+		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count-1].points.Add(target.position);
 	}
 
 	void endStroke() {
-		isDrawing = false;
+        if (!isPlaying && refineStrokes) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].refine();
+        isDrawing = false;
 	}
 
 	public void testRandomStrokes() {
@@ -284,7 +288,7 @@ public class LightningArtist : MonoBehaviour {
 		float range = 5f;
 
 		for (int i=0; i<numStrokes; i++) {
-			instantiateStroke();
+			instantiateStroke(mainColor);
 			randomStroke(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count-1], numSegments, range);
 		}
 	}
@@ -297,15 +301,6 @@ public class LightningArtist : MonoBehaviour {
 	}
 
 	public void resetAll() {
-		/*
-		if (frameList[currentFrame].brushStrokeList != null) {
-			for (int i=0; i<frameList[currentFrame].brushStrokeList.Count; i++) {
-				Destroy(frameList[currentFrame].brushStrokeList[i].gameObject);
-			}
-			frameList[currentFrame].brushStrokeList = new List<BrushStroke>();
-		}
-		*/
-
 		for (int i = 0; i < layerList[currentLayer].frameList.Count; i++) {
 			layerList[currentLayer].frameList[i].reset();
 			Destroy (layerList[currentLayer].frameList[i].gameObject);
@@ -316,28 +311,22 @@ public class LightningArtist : MonoBehaviour {
 		refreshFrame();
 	}
 
-	public void applyScaleAndOffset() {
+	/*
+    public void applyScaleAndOffset() {
 		if (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList != null) {
 			for (int i=0; i<layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
 				layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushSize = brushSize;
 
-				//frameList[currentFrame].brushStrokeList[i].useScaleAndOffset = useScaleAndOffset;
 				layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].useScaleAndOffset = true;
-				layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].globalScale = globalScale;
-				layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].globalOffset = globalOffset;
+				//layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].globalScale = globalScale;
+				//layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].globalOffset = globalOffset;
 			}
 		}	
 	}
+    */
 
 	void changeFrame(int index) {
 		isPlaying = false;
-
-		/*
-		for (int i=0; i < frameList.Count; i++) {
-			frameList[i].showFrame(false);
-			setFrameBrightness(i, frameBrightNormal);
-		}
-		*/
 
 		frameMotor(index);
 	}
@@ -357,7 +346,6 @@ public class LightningArtist : MonoBehaviour {
 				layerList [i].frameList [layerList [i].currentFrame].showFrame (true);
 			}
 
-			//animVal += normalizedFrameInterval * index; // doesn't lock to app current frame
 			if (i == longestLayer) animVal = normalizedFrameInterval * layerList[longestLayer].currentFrame; // TODO should this be longest layer?
 		}
 	}
@@ -379,72 +367,66 @@ public class LightningArtist : MonoBehaviour {
 	}
 
 	void showAllFrames(bool _b) {
-		//isPlaying = false; // *** was making Play always true
-
 		for (int i=0; i < layerList[currentLayer].frameList.Count; i++) {
-			//if (frameList[i].brushStrokeList.Count > 0) {
 			if (i >= layerList[currentLayer].currentFrame - onionSkinRange && i <= layerList[currentLayer].currentFrame + onionSkinRange) {
-				layerList[currentLayer].frameList[i].showFrame (_b);
+				layerList[currentLayer].frameList[i].showFrame(_b);
 			}
 
 			if (_b) {
 				if (i != layerList[currentLayer].currentFrame) {
-					for (int j=0; j < layerList[currentLayer].frameList[i].brushStrokeList.Count; j++) {
-						setFrameBrightness(i, frameBrightDim);
-					}
+					layerList[currentLayer].frameList[i].setFrameBrightness(frameBrightDim);
 				} else {
-					for (int j=0; j < layerList[currentLayer].frameList[i].brushStrokeList.Count; j++) {
-						setFrameBrightness(i, frameBrightNormal);
-					}
+                    layerList[currentLayer].frameList[i].setFrameBrightness(frameBrightNormal);
 				}
 			} else {
-				for (int j=0; j < layerList[currentLayer].frameList[i].brushStrokeList.Count; j++) {
-					setFrameBrightness(i, frameBrightNormal);
-				}
+                layerList[currentLayer].frameList[i].setFrameBrightness(frameBrightNormal);
 			}
 		}
 
 		if (!_b) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].showFrame(true);
 	}
 
-	void setFrameBrightness(int _index, float _f) {
-		for (int j=0; j < layerList[currentLayer].frameList[_index].brushStrokeList.Count; j++) {
-			//frameList[_index].brushStrokeList[j].lineRenderer.material.SetColor("_TintColor", new Color(_f, _f, _f));
-			layerList[currentLayer].frameList[_index].brushStrokeList[j].setBrushBrightness(_f);
-		}
-	}
-
-	void instantiateStroke() {
-		GameObject g = (GameObject) Instantiate(brushPrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
-		BrushStroke b = g.GetComponent<BrushStroke>();
-		b.brushMode = (BrushStroke.BrushMode) brushMode;
-		b.brushSize = brushSize;
-		b.transform.SetParent(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].transform);
-		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Add(b);	
-	}
-
 	void instantiateStroke(Color c) {
-		GameObject g = (GameObject) Instantiate(brushPrefab, Vector3.zero, Quaternion.identity);
-		BrushStroke b = g.GetComponent<BrushStroke>();
-		b.brushMode = (BrushStroke.BrushMode) brushMode;
+        BrushStroke b = Instantiate(brushPrefab);
+        //b.brushMode = (BrushStroke.BrushMode) brushMode;
+        if (brushMat[(int)brushMode]) b.mat = brushMat[(int)brushMode];
 		b.brushSize = brushSize;
 		b.brushColor = c;
+		if (useEndColor) {
+			b.brushEndColor = endColor;
+		} else {
+			b.brushEndColor = c;
+		}
 		b.transform.SetParent(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].transform);
 		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Add(b);	
 	}
 
+    public void inputInstantiateStroke(Color c, List<Vector3> points) {
+        BrushStroke b = Instantiate(brushPrefab);
+        b.points = points;
+        //b.brushMode = (BrushStroke.BrushMode)brushMode;
+        if (brushMat[(int)brushMode]) b.mat = brushMat[(int)brushMode];
+        b.brushSize = brushSize;
+        b.brushColor = c;
+        if (useEndColor) {
+            b.brushEndColor = endColor;
+        } else {
+            b.brushEndColor = c;
+        }
+        b.transform.SetParent(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].transform);
+        layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Add(b);
+    }
+
 	void instantiateFrame() {
-		GameObject g = (GameObject) Instantiate(framePrefab, Vector3.zero, Quaternion.identity);
-		BrushFrame f = g.GetComponent<BrushFrame>();
-		f.transform.SetParent(layerList[currentLayer].transform);
+        BrushFrame f = Instantiate(framePrefab);
+        f.transform.SetParent(layerList[currentLayer].transform);
 		layerList[currentLayer].frameList.Add(f);
 		longestLayer = getLongestLayer();
 	}
 
 	void instantiateLayer() {
-		GameObject g = (GameObject) Instantiate(layerPrefab, Vector3.zero, Quaternion.identity);
-		BrushLayer l = g.GetComponent<BrushLayer>();
-		l.transform.SetParent(transform);
+        BrushLayer l = Instantiate(layerPrefab);
+        l.transform.SetParent(transform);
 		layerList.Add(l);
 		Debug.Log ("layerList has " + layerList.Count + " layers.");
 	}
@@ -460,10 +442,6 @@ public class LightningArtist : MonoBehaviour {
 			Destroy(layerList[h].gameObject);
 		}
 		layerList = new List<BrushLayer>();
-		//currentLayer = 0;
-		//layerList[currentLayer].frameList = new List<BrushFrame> ();
-		//instantiateLayer();
-		//instantiateFrame();
 
 		string url;
 		
@@ -490,12 +468,10 @@ public class LightningArtist : MonoBehaviour {
 		WWW www = new WWW(url);
 		yield return www;
 
-		//Debug.Log(www.text);
 		Debug.Log ("+++ File reading finished. Begin parsing...");
 		yield return new WaitForSeconds (consoleUpdateInterval);
 
 		jsonNode = JSON.Parse (www.text);
-		//Debug.Log("*** " + jsonNode["grease_pencil"][0]["layers"][0]["frames"][0]["strokes"][0]["points"].Count);
 
 		for (int f = 0; f < jsonNode["grease_pencil"][0]["layers"].Count; f++) {
 			instantiateLayer();
@@ -514,21 +490,24 @@ public class LightningArtist : MonoBehaviour {
 
 					instantiateStroke (c);
 					for (int j = 0; j < jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"].Count; j++) {
-						float x = 0f;
-						float y = 0f;
-						float z = 0f;
+						//float x = 0f;
+						//float y = 0f;
+						//float z = 0f;
 
-						if (useScaleAndOffsetRead) {
+						/*
+                        if (useScaleAndOffsetRead) {
 							x = (jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][0].AsFloat * globalScale.x) + globalOffset.x;
 							y = (jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][1].AsFloat * globalScale.y) + globalOffset.y;
 							z = (jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][2].AsFloat * globalScale.z) + globalOffset.z; 						
 						} else {
-							x = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][0].AsFloat;
-							y = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][1].AsFloat;
-							z = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][2].AsFloat; 				
-						}
+                        */
+						float x = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][0].AsFloat;
+						float y = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][1].AsFloat;
+						float z = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["points"][j]["co"][2].AsFloat; 				
+						//}
 
-						Vector3 p = new Vector3 (x, y, z);
+						Vector3 p = applyTransformMatrix(new Vector3 (x, y, z));
+                        //if (useScaleAndOffsetRead) p = applyTransformMatrix(p);
 
 						layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].points.Add (p);	
 					}
@@ -608,19 +587,27 @@ public class LightningArtist : MonoBehaviour {
 					if (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count > 0) {
 						sbb += "                                    \"points\":[" + "\n";
 						for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-							float x = 0f;
-							float y = 0f;
-							float z = 0f;
+							//float x = 0f;
+							//float y = 0f;
+							//float z = 0f;
 
-							if (useScaleAndOffsetWrite) {
+							/*
+                            if (useScaleAndOffsetWrite) {
 								x = (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].x * globalScale.x) + globalOffset.x;
 								y = (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y * globalScale.y) + globalOffset.y;
 								z = (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z * globalScale.z) + globalOffset.z;
 							} else {
-								x = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].x;
-								y = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y;
-								z = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z;
-							}
+                            */
+							float x = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].x;
+							float y = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y;
+							float z = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z;
+							//}
+                            //if (useScaleAndOffsetWrite) {
+                                //Vector3 p = applyTransformMatrix(new Vector3(x, y, z));
+                                //x = p.x;
+                                //y = p.y;
+                                //z = p.z;
+                            //}
 
 							if (j == layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count - 1) {
 								sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}" + "\n";
@@ -665,13 +652,6 @@ public class LightningArtist : MonoBehaviour {
 			FINAL_LAYER_LIST.Add(sb);
 		}
 
-		/*
-		string s = "{" + "\n" +
-			"    \"brushstrokes\":[" + "\n" +
-			sb +
-			"    ]" + "\n" +
-			"}" + "\n";
-		*/
 		yield return new WaitForSeconds(consoleUpdateInterval);
 		Debug.Log("+++ Parsing finished. Begin file writing.");
 		yield return new WaitForSeconds(consoleUpdateInterval);
@@ -750,7 +730,7 @@ public class LightningArtist : MonoBehaviour {
 		for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
 			bool foundStroke = false;
 			for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-				if (!foundStroke && Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.transform.position) < eraseRange) {
+				if (!foundStroke && Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < eraseRange) {
 					strokeToDelete = i;
 					foundStroke = true;
 				}
@@ -768,13 +748,18 @@ public class LightningArtist : MonoBehaviour {
 		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.RemoveAt(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1); 
 	}
 
+	void eraseFirstStroke() {
+		Destroy(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[0].gameObject);
+		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.RemoveAt(0); 
+	}
+
 	void doPush() {
 		isPlaying = false;
 
 		for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
 			for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-				if (Vector3.Distance (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.transform.position) < pushRange) {
-					layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j] = Vector3.Lerp (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.transform.position, pushSpeed);
+				if (Vector3.Distance (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < pushRange) {
+					layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j] = Vector3.Lerp (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position, pushSpeed);
 					layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].isDirty = true;
 				}
 			}
@@ -786,7 +771,7 @@ public class LightningArtist : MonoBehaviour {
 
 		for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
 			for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-				if (Vector3.Distance (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.transform.position) < colorPickRange) {
+				if (Vector3.Distance (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < colorPickRange) {
 					mainColor = new Color(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.r, layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.g, layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.b);
 				}
 			}
@@ -811,9 +796,9 @@ public class LightningArtist : MonoBehaviour {
 	void copyFramePointsForward(int index) {
 		Debug.Log("Before copy (" + index + "): " + layerList[currentLayer].frameList[index - 1].brushStrokeList.Count + " " + layerList[currentLayer].frameList[index].brushStrokeList.Count);
 		for (int i = 0; i < layerList[currentLayer].frameList[index - 1].brushStrokeList.Count; i++) {
-			instantiateStroke();
-			layerList[currentLayer].frameList[index].brushStrokeList[i].points = layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points;
-			layerList[currentLayer].frameList[index].brushStrokeList[i].brushColor = layerList[currentLayer].frameList[index - 1].brushStrokeList[i].brushColor;
+			instantiateStroke(mainColor);
+			layerList[currentLayer].frameList[index].brushStrokeList[i].setPoints(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points);
+			layerList[currentLayer].frameList[index].brushStrokeList[i].setBrushColor(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].brushColor);
 			layerList[currentLayer].frameList[index].brushStrokeList[i].isDirty = true;
 		}
 		Debug.Log("After copy (" + index + "): " + layerList[currentLayer].frameList[index - 1].brushStrokeList.Count + " " + layerList[currentLayer].frameList[index].brushStrokeList.Count);
@@ -829,28 +814,7 @@ public class LightningArtist : MonoBehaviour {
 	}
 
 	public void inputNewFrameAndCopy() {
-		/*
-		List<BrushStroke> b = new List<BrushStroke>();
-
-		Debug.Log("Frame Copy Start: " + b.Count + " " + frameList[currentFrame].brushStrokeList.Count);
-
-		for (int i = 0; i <frameList[currentFrame].brushStrokeList.Count; i++) {
-			b.Add(frameList[currentFrame].brushStrokeList[i]);
-		}
-		*/
-
 		inputNewFrame();
-
-		/*
-		for (int i = 0; i < b.Count; i++) {
-			instantiateStroke();
-			frameList[currentFrame].brushStrokeList[i].points = b[i].points;
-		}
-		*/
-
-		//refreshFrame();
-
-		//Debug.Log("Frame Copy End: " + b.Count + " " + frameList[currentFrame].brushStrokeList.Count);
 
 		copyFramePointsForward(layerList[currentLayer].currentFrame);
 	}
@@ -869,11 +833,9 @@ public class LightningArtist : MonoBehaviour {
 			for (int i = 0; i < layerList[h].frameList.Count; i++) {
 				layerList[h].frameList[i].showFrame(false);
 			}
-			//layerList[h].frameList[layerList[h].currentFrame].showFrame(true); // needed?
 		}
 
 		if (isPlaying) {
-			//currentFrame = 0;
 			doAudioPlay();
 		} else {
 			for (int h = 0; h < layerList.Count; h++) {
@@ -927,6 +889,10 @@ public class LightningArtist : MonoBehaviour {
 		eraseLastStroke();
 	}
 
+	public void inputEraseFirstStroke() {
+		eraseFirstStroke();
+	}
+
 	public void inputPush() {
 		doPush();
 	}
@@ -962,6 +928,17 @@ public class LightningArtist : MonoBehaviour {
 		currentLayer = layerList.Count - 1;
 		if (createFrameWithLayer && layerList[currentLayer].frameList.Count < 1) instantiateFrame();
 	}
+
+    public void brushSizeInc() {
+        brushSize += brushSizeDelta;
+    }
+
+    public void brushSizeDec() {
+        brushSize -= brushSizeDelta;
+        if (brushSize < brushSizeDelta) {
+            brushSize = brushSizeDelta;
+        }
+    }
 
 	void doAudioPlay() {
 		if (audio != null) {

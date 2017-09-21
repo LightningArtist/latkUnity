@@ -27,7 +27,7 @@ along with the Lightning Artist Toolkit (Blender).  If not, see
 <http://www.gnu.org/licenses/>.
 '''
 
-# 1 of 8. MAIN
+# 1 of 9. MAIN
 
 bl_info = {
     "name": "Lightning Artist Toolkit (Latk)", 
@@ -39,6 +39,7 @@ import bpy
 import bpy_extras
 from mathutils import *
 from math import sqrt
+import math
 import json
 import re
 from bpy_extras.io_utils import unpack_list
@@ -57,7 +58,7 @@ from bpy_extras.io_utils import (ImportHelper, ExportHelper)
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 2 of 8. TOOLS
+# 2 of 9. TOOLS
 
 def getLayerInfo(layer):
     return layer.info.split(".")[0]
@@ -1358,11 +1359,17 @@ def TestView3dOperatorFromPythonScript():       # Run this from a python script 
     #bpy.ops.screen.screen_full_area(oContextOverride)
     print("TestView3dOperatorFromPythonScript() completed succesfully.")
 
+def addVec3(p1, p2):
+    return(p1[0]+p2[0], p1[1]+p2[1], p1[2]+p2[2])
+
+def multVec3(p1, p2):
+    return(p1[0]*p2[0], p1[1]*p2[1], p1[2]*p2[2])
+
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 3 of 8. READ / WRITE
+# 3 of 9. READ / WRITE
 
 def exportForUnity(sketchFab=True):
     start, end = getStartEnd()
@@ -1511,7 +1518,9 @@ def writeBrushStrokes(filepath=None, bake=True):
             currentFrame = h
             goToFrame(h)
             sb += "                        {" + "\n" # one frame
-            #sb += "                           \"index\": " + str(h) + ",\n"
+            sb += "                           \"frame_number\": " + str(layer.frames[currentFrame].frame_number) + ",\n"
+            if (layer.parent):
+                sb += "                           \"parent_location\": " + "[" + str(layer.parent.location[0]) + ", " + str(layer.parent.location[1]) + ", " + str(layer.parent.location[2]) + "],\n"
             sb += "                            \"strokes\": [" + "\n"
             if (len(layer.frames[currentFrame].strokes) > 0):
                 sb += "                                {" + "\n" # one stroke
@@ -1576,6 +1585,8 @@ def writeBrushStrokes(filepath=None, bake=True):
         #~
         sf = "                {" + "\n" 
         sf += "                    \"name\": \"" + layer.info + "\"," + "\n"
+        if (layer.parent):
+            sf += "                    \"parent\": \"" + layer.parent.name + "\"," + "\n"
         #s += "                    \"loop_in\":" + str(0) + "," + "\n"
         #s += "                    \"loop_out\":" + str(0) + "," + "\n"
         #s += "                    \"loop\":" + str(False).lower() + "," + "\n"
@@ -1731,12 +1742,13 @@ def writeSvg(filepath=None):
                     #pass
                 svg.append("\t\t\t" + svgStroke(points=stroke.points, stroke=(cStroke[0], cStroke[1], cStroke[2]), fill=(cFill[0], cFill[1], cFill[2]), strokeWidth=minLineWidth, strokeOpacity=cStroke[3], fillOpacity=cFill[3], camera=camera) + "\r")
             #~
-            idTagBase = "anim_" + layerInfo + "_frame"
-            idTag = idTagBase + str(i)
-            prevIdTag = "0s"
-            if (i>0):
-                prevIdTag = idTagBase + str(i-1) + ".end"
-            svg.append("\t\t\t" + svgAnimate(frame=frame.frame_number, fps=fps, duration=duration, idTag=idTag, prevIdTag=prevIdTag) + "\r")
+            #idTagBase = "anim_" + layerInfo + "_frame"
+            #idTag = idTagBase + str(i)
+            #prevIdTag = "0s"
+            #if (i>0):
+                #prevIdTag = idTagBase + str(i-1) + ".end"
+            #svg.append("\t\t\t" + svgAnimate(frame=frame.frame_number, fps=fps, duration=duration, idTag=idTag, prevIdTag=prevIdTag) + "\r")
+            svg.append("\t\t\t" + svgAnimate(frame=frame.frame_number, fps=fps, duration=duration) + "\r")
             svg.append("\t\t" + "</g>" + "\r")
         svg.append("\t" + "</g>" + "\r")
     #~
@@ -1745,10 +1757,11 @@ def writeSvg(filepath=None):
     #~
     writeTextFile(url, svg)
 
-def svgAnimate(frame=0, fps=12, duration=10, idTag=None, prevIdTag=None):
+def svgAnimate(frame=0, fps=12, duration=10, startFrame=False, endFrame=False):
     keyIn = (float(frame) / float(fps)) / float(duration)
     keyOut = keyIn + (1.0/float(fps))
-    returns = "<animate id=\"" + str(idTag) + "\" attributeName=\"display\" values=\"none;inline;none;none\" keyTimes=\"0;" + str(keyIn) + ";" + str(keyOut) + ";1\" dur=\"" + str(duration) + "s\" begin=\"0s\" repeatCount=\"indefinite\"/>"
+    #returns = "<animate id=\"" + str(idTag) + "\" attributeName=\"display\" values=\"none;inline;none;none\" keyTimes=\"0;" + str(keyIn) + ";" + str(keyOut) + ";1\" dur=\"" + str(duration) + "s\" begin=\"0s\" repeatCount=\"indefinite\"/>"
+    returns = "<animate attributeName=\"display\" repeatCount=\"indefinite\" dur=\"" + str(duration) + "s\" keyTimes=\"0;" + str(keyIn) + ";" + str(keyOut) + ";1\" values=\"none;inline;none;none\"/>"
     return returns
 
 def svgStroke(points=None, stroke=(0,0,1), fill=(1,0,0), strokeWidth=2.0, strokeOpacity=1.0, fillOpacity=1.0, camera=None, closed=False):
@@ -1983,11 +1996,214 @@ def gmlParser(filepath=None, splitStrokes=True):
     print("* * * * * * * * * * * * * * *")
     print("strokes: " + str(strokeCounter) + "   points: " + str(pointCounter))
 
+def writeGml(filepath=None, make2d=False):
+    timeCounter = 0
+    timeIncrement = 0.01
+    #~
+    '''
+    # painter version
+    camera=getActiveCamera()
+    outputFile = []
+    dim = (float(getSceneResolution()[0]), float(getSceneResolution()[1]), 0.0)
+    outputFile.append(painterHeader(dim))
+    #~
+    strokes = []
+    gp = getActiveGp()
+    palette = getActivePalette()
+    for layer in gp.layers:
+        if (layer.lock == False):
+            for stroke in layer.active_frame.strokes:
+                strokes.append(stroke)
+    counter = 0
+    for stroke in strokes:
+        color = palette.colors[stroke.color.name].color
+        points = []
+        for point in stroke.points: 
+            co = getWorldCoords(co=point.co, camera=camera)
+            x = co[0] 
+            y = co[1]
+            prs = point.pressure
+            point = (x, y, prs, counter)
+            counter += 1
+            points.append(point)
+        outputFile.append(painterStroke(points, color))
+    #~
+    outputFile.append(painterFooter())
+    writeTextFile(filepath, outputFile)    
+    '''  
+    #~  
+    '''
+    # tilt brush version
+    def dump_sketch(sketch, filename):
+    globalScale = (-0.01, 0.01, 0.01)
+    globalOffset = (0, 0, 0)
+    useScaleAndOffset = True
+    numPlaces = 7
+    roundValues = True
+    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+    sg = gmlHeader((512,512,512))
+    allVals = []
+    minVal = 0
+    maxVal = 1
+    for stroke in sketch.strokes:
+        for controlpoint in stroke.controlpoints:
+            for val in controlpoint.position:
+                allVals.append(val)
+    allVals.sort()
+    minVal = allVals[0]
+    maxVal = allVals[len(allVals)-1]
+    for stroke in sketch.strokes:
+        color = (1,1,1)
+        try:
+            color = (stroke.brush_color[0], stroke.brush_color[1], stroke.brush_color[2], 1)
+        except:
+            pass
+        points = []
+        for controlpoint in stroke.controlpoints:
+            point = controlpoint.position
+            x = remap(point[0], minVal, maxVal, 0, 1)
+            y = remap(point[1], minVal, maxVal, 0, 1)
+            z = remap(point[2], minVal, maxVal, 0, 1)
+            points.append((x,y,z))
+        sg += gmlStroke(points, color)
+    sg += gmlFooter()
+    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+    url = filename + ".gml"
+    with open(url, "w") as f:
+        f.write(sg)
+        f.closed
+        print("Wrote " + url)
+    '''
+    #~
+    globalScale = (10, 10, 10)
+    globalOffset = (0, 0, 0)
+    useScaleAndOffset = True
+    numPlaces = 7
+    roundValues = True
+    #~
+    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+    sg = gmlHeader((512,512,512))
+    for i in range(0,len(strokes)):
+        sg += gmlStroke(strokes[i])
+    sg += gmlFooter()
+    # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+    #~
+    url = filename + ".gml"
+    with open(url, "w") as f:
+        f.write(sg)
+        f.closed
+        print("Wrote " + url)    
+
+def gmlHeader(dim=(1024,1024,1024)):
+    s = "<gml spec=\"0.1b\">" + "\r"
+    s += "\t<tag>" + "\r"
+    s += "\t\t<header>" + "\r"
+    s += "\t\t\t<client>" + "\r"
+    s += "\t\t\t\t<name>KinectToPin</name>" + "\r"
+    s += "\t\t\t</client>" + "\r"
+    s += "\t\t\t<environment>" + "\r"
+    s += "\t\t\t\t<up>" + "\r"
+    s += "\t\t\t\t\t<x>0</x>" + "\r"
+    s += "\t\t\t\t\t<y>1</y>" + "\r"
+    s += "\t\t\t\t\t<z>0</z>" + "\r"
+    s += "\t\t\t\t</up>" + "\r"
+    s += "\t\t\t\t<screenBounds>" + "\r"
+    s += "\t\t\t\t\t<x>" + str(dim[0]) + "</x>" + "\r"
+    s += "\t\t\t\t\t<y>" + str(dim[1]) + "</y>" + "\r"
+    s += "\t\t\t\t\t<z>" + str(dim[2]) + "</z>" + "\r"
+    s += "\t\t\t\t</screenBounds>" + "\r"
+    s += "\t\t\t</environment>" + "\r"
+    s += "\t\t</header>" + "\r"
+    s += "\t\t<drawing>" + "\r"
+    return s
+
+def gmlFooter():
+    s = "\t\t</drawing>" + "\r"
+    s += "\t</tag>" + "\r"
+    s += "</gml>" + "\r"
+    return s
+
+def gmlStroke(points):
+    s = "\t\t\t<stroke>" + "\r"
+    for point in points:
+        s += gmlPoint(point)
+    s += "\t\t\t</stroke>" + "\r"
+    return s
+
+def gmlPoint(point):
+    global timeCounter
+    global timeIncrement
+    s = "\t\t\t\t<pt>" + "\r"
+    s += "\t\t\t\t\t<x>" + str(point[0]) + "</x>" + "\r"
+    s += "\t\t\t\t\t<y>" + str(point[1]) + "</y>" + "\r"
+    s += "\t\t\t\t\t<z>" + str(point[2]) + "</z>" + "\r"
+    s += "\t\t\t\t\t<time>" + str(timeCounter) + "</time>" + "\r"
+    s += "\t\t\t\t</pt>" + "\r"
+    timeCounter += timeIncrement
+    return s
+
+# ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+def smilParser(filepath=None):
+    if not filepath:
+        filepath = "C:\\Users\\nick\\Desktop\\error.svg"
+    globalScale = (0.01, 0.01, 0.01)
+    screenBounds = (1, 1, 1)
+    up = (0, 1, 0)
+    useTime = True
+    minStrokeLength=3
+    #splitStrokes = True
+    #~
+    masterLayerList = []
+    tree = etree.parse(filepath)
+    root = tree.getroot()
+    '''
+    if (root.tag.lower() != "gml"):
+        print("Not a GML file.")
+        return
+    '''
+    #~
+    strokeCounter = 0
+    pointCounter = 0
+    gp = getActiveGp()
+    fps = getSceneFps()
+    start, end = getStartEnd()
+    #~
+    paths = getAllTags("path", tree)
+    for path in paths:
+        strokes = path.attrib["d"].split('M')
+        for stroke in strokes:
+            pointsList = []
+            pointsRaw = stroke.split(" ")
+            for pointRaw in pointsRaw:
+                pointRaw = pointRaw.split("Q")[0]
+                pointRaw = pointRaw.replace("Z", "")
+                pointRaw = pointRaw.replace("L", "")
+                try:
+                    pointsList.append(float(pointRaw))
+                except:
+                    pass
+            if (len(pointsList) % 2 != 0):
+                pointsList.pop()
+            points = []
+            for i in range(0, len(pointsList), 2):
+                point = (pointsList[i] * globalScale[0], pointsList[i+1] * globalScale[1], 0)
+                points.append(point)
+            if (len(points) > 1):
+                drawPoints(points)
+
+def getAllTags(name=None, xml=None):
+    returns = []
+    for node in xml.iter():
+        if (node.tag.split('}')[1] == name):
+            returns.append(node)
+    return returns
+
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 4 of 8. MATERIALS / RENDERING
+# 4 of 9. MATERIALS / RENDERING
 
 # http://blender.stackexchange.com/questions/17738/how-to-uv-unwrap-object-with-python
 def planarUvProject():
@@ -2210,7 +2426,7 @@ def makeEmissionMtl():
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 5 of 8. MESHES / GEOMETRY
+# 5 of 9. MESHES / GEOMETRY
 
 def joinObjects(target=None, center=False):
     if not target:
@@ -2312,7 +2528,7 @@ def assembleMesh(export=False, createPalette=True):
             saveFile(origFileName + "_ASSEMBLY")
             print(origFileName + "_ASSEMBLY.blend" + " was saved but some groups were missing.")
 
-def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=False, _animateFrames=True, _solidify=False, _subd=0, _remesh=False, _consolidateMtl=True, _caps=True, _joinMesh=True, _uvStroke=False, _uvFill=False):
+def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=False, _animateFrames=True, _solidify=False, _subd=0, _remesh="none", _consolidateMtl=True, _caps=True, _joinMesh=True, _uvStroke=False, _uvFill=False):
     if (_joinMesh==True or _remesh==True):
         _bakeMesh=True
     #~
@@ -2420,8 +2636,8 @@ def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _
                         bpy.context.object.modifiers["Decimate"].ratio = _decimate     
                         meshObj = applyModifiers(crv_ob)
                         #~
-                        if (_remesh==True):
-                            meshObj = remesher(meshObj)
+                        if (_remesh != "none"):
+                            meshObj = remesher(meshObj, mode=_remesh)
                         #~
                         # + + + + + + +
                         if (palette.colors[stroke.colorname].fill_alpha > 0.001):
@@ -2616,6 +2832,23 @@ def getActiveCurvePoints():
         return target.data.splines.active.bezier_points
     else:
         return target.data.splines.active.points      
+
+def curveToStroke(target=None):
+    if not target:
+        target = s()[0]
+    for spline in target.data.splines:
+        points = []
+        splinePoints = None
+        if (spline.type=="BEZIER"):
+            splinePoints = spline.bezier_points
+        else:
+            splinePoints = spline.points
+        for point in splinePoints:
+            points.append((point.co[0], point.co[2], point.co[1]))
+        try:
+            drawPoints(points)
+        except:
+            pass
 
 def centerOriginAlt(obj):
     oldLoc = obj.location
@@ -2897,7 +3130,152 @@ def createFill(inputVerts, useUvs=False):
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 6 of 8. SHORTCUTS
+# 6 of 9. DRAWING
+
+def makeLine(p1, p2):
+    return drawPoints([p1, p2])
+
+def makeGrid(gridRows=10, gridColumns=10, cell=0.1, zPos=0):
+    strokes = []
+    #~
+    xMax = gridRows * cell;
+    yMax = gridColumns * cell;
+    xHalf = xMax / 2;
+    yHalf = yMax / 2;
+    #~
+    for x in range(0, gridRows+1):
+        xPos = x * cell;
+        strokes.append(makeLine((-xHalf, xPos - xHalf, zPos), (xHalf, xPos - xHalf, zPos)))
+    #~
+    for y in range(0, gridColumns+1):
+        yPos = y * cell;
+        strokes.append(makeLine((yPos - yHalf, -yHalf, zPos), (yPos - yHalf, yHalf, zPos)))
+    #~
+    return strokes
+
+
+def makeCube(pos=(0,0,0), size=1):
+    strokes = []
+    s = size / 2
+    #~
+    p1 = addVec3((-s, -s, s), pos)
+    p2 = addVec3((-s, s, s), pos)
+    p3 = addVec3((s, -s, s), pos)
+    p4 = addVec3((s, s, s), pos)
+    p5 = addVec3((-s, -s, -s), pos)
+    p6 = addVec3((-s, s, -s), pos)
+    p7 = addVec3((s, -s, -s), pos)
+    p8 = addVec3((s, s, -s), pos)
+    #~
+    strokes.append(makeLine(p1, p2))
+    strokes.append(makeLine(p2, p4))
+    strokes.append(makeLine(p3, p1))
+    strokes.append(makeLine(p4, p3))
+    #~
+    strokes.append(makeLine(p5, p6))
+    strokes.append(makeLine(p6, p8))
+    strokes.append(makeLine(p7, p5))
+    strokes.append(makeLine(p8, p7))
+    #~
+    strokes.append(makeLine(p1, p5))
+    strokes.append(makeLine(p2, p6))
+    strokes.append(makeLine(p3, p7))
+    strokes.append(makeLine(p4, p8))
+    #~
+    return strokes
+
+def makeSquare(pos=(0,0,0), size=1):
+    strokes = []
+    s = size / 2
+    p1 = addVec3((-s, -s, 0), pos)
+    p2 = addVec3((-s, s, 0), pos)
+    p3 = addVec3((s, -s, 0), pos)
+    p4 = addVec3((s, s, 0), pos)
+    strokes.append(makeLine(p1, p2))
+    strokes.append(makeLine(p1, p3))
+    strokes.append(makeLine(p4, p2))
+    strokes.append(makeLine(p4, p3))
+    #~
+    return strokes
+
+def makeCircle(pos=(0,0,0), size=1, resolution=10, vertical=True):
+    points = []
+    x = 0
+    y = 0
+    angle = 0.0
+    step = 1.0/resolution
+    #~
+    while (angle < 2 * math.pi):
+        x = (size/2.0) * math.cos(angle)
+        y = (size/2.0) * math.sin(angle)
+        if (vertical==True):
+            points.append(addVec3((x, y, 0), pos))
+        else:
+            points.append(addVec3((x, 0, y), pos))
+        angle += step
+    #~
+    return drawPoints(points)
+
+def makeSphere(pos=(0,0,0), size=1, resolution=10, lat=10, lon=10):
+    points = []
+    for i in range(0, lat):
+        for j in range(0, lon):
+            points.append(multVec3(addVec3(getLatLon(i, j), pos), (size,size,size)))
+    drawPoints(points)
+
+def getLatLon(lat, lon):
+    eulat = (math.pi / 2.0) - lat
+    slat = math.sin(eulat)
+    x = math.cos(lon) * slat
+    y = math.sin(lon) * slat
+    z = math.cos(eulat)
+    return (x, y, z)
+
+def makeStarBurst(pos=(0,0,0), size=1, reps=20):
+    s = size/2.0
+    strokes = []
+    for i in range(0, reps):
+        lat = random.uniform(0, 90)
+        lon = random.uniform(0, 180)
+        p2 = multVec3(getLatLon(lat, lon), (s, s, s))
+        strokes.append(drawPoints([pos, p2]))
+    return strokes
+
+def makeTriangle(pos=(0,0,0), size=1):
+    s = size/2.0
+    p1 = (pos[0], pos[1] + s, pos[2])
+    p2 = (pos[0] - s, pos[1] - s, pos[2])
+    p3 = (pos[0] + s, pos[1] - s, pos[2])
+    return drawPoints([p1, p2, p3, p1])
+
+def makePyramid(pos=(0,0,0), size=1):
+    strokes = []
+    s = size/2.0
+    p1 = (pos[0], pos[1] + s, pos[2])
+    p2 = (pos[0] - s, pos[1] - s, pos[2] + s)
+    p3 = (pos[0] + s, pos[1] - s, pos[2] + s)
+    #~
+    strokes.append(drawPoints([p1, p2, p3, p1]))
+    #~
+    p4 = (pos[0], pos[1] + s, pos[2])
+    p5 = (pos[0] - s, pos[1] - s, pos[2] - s)
+    p6 = (pos[0] + s, pos[1] - s, pos[2] - s)
+    #~
+    strokes.append(drawPoints([p4, p5, p6, p4]))
+    #~
+    strokes.append(drawPoints([p2, p5]))
+    strokes.append(drawPoints([p3, p6]))
+    #~
+    return strokes
+
+
+
+
+# * * * * * * * * * * * * * * * * * * * * * * * * * *
+# * * * * * * * * * * * * * * * * * * * * * * * * * *
+# * * * * * * * * * * * * * * * * * * * * * * * * * *
+
+# 7 of 9. SHORTCUTS
 
 def mf():
     dn()
@@ -2970,7 +3348,7 @@ splf = splitLayersAboveFrameLimit
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 7 of 8. TESTS
+# 8 of 9. TESTS
 
 def testStroke():
     gp = getActiveGp()
@@ -3001,7 +3379,7 @@ def testDrawPoints():
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-# 8 of 8. UI
+# 9 of 9. UI
 
 class ImportLatk(bpy.types.Operator, ImportHelper):
     """Load a Latk File"""
@@ -3137,6 +3515,34 @@ class ImportGml(bpy.types.Operator, ImportHelper):
         la.gmlParser(**keywords)
         return {'FINISHED'} 
 
+class ExportGml(bpy.types.Operator, ExportHelper):
+    """Save an SVG SMIL File"""
+
+    bl_idname = "export_scene.gml"
+    bl_label = 'Export Gml'
+    bl_options = {'PRESET'}
+
+    filename_ext = ".gml"
+    filter_glob = StringProperty(
+            default="*.gml",
+            options={'HIDDEN'},
+            )
+
+    make2d = BoolProperty(name="Make 2D", description="Project Coordinates to Camera View", default=True)
+
+    def execute(self, context):
+        import latk as la
+        #keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob", "split_mode", "check_existing", "bake"))
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob", "split_mode", "check_existing"))
+        if bpy.data.is_saved and context.user_preferences.filepaths.use_relative_paths:
+            import os
+            #keywords["relpath"] = os.path.dirname(bpy.data.filepath)
+        #~
+        keywords["make2d"] = self.make2d
+        #~
+        la.writeGml(**keywords)
+        return {'FINISHED'} 
+
 class ExportSvg(bpy.types.Operator, ExportHelper):
     """Save an SVG SMIL File"""
 
@@ -3197,19 +3603,17 @@ def menu_func_import(self, context):
     self.layout.operator(ImportLatk.bl_idname, text="Latk Animation (.json)")
     self.layout.operator(ImportGml.bl_idname, text="Graffiti Markup Language (.gml)")
 
-
 def menu_func_export(self, context):
     self.layout.operator(ExportLatk.bl_idname, text="Latk Animation (.json)")
+    #self.layout.operator(ExportGml.bl_idname, text="Graffiti Markup Language (.gml)")
     self.layout.operator(ExportSvg.bl_idname, text="SVG SMIL Animation (.svg)")
     self.layout.operator(ExportPainter.bl_idname, text="Corel Painter Script (.txt)")
-
 
 def register():
     bpy.utils.register_module(__name__)
 
     bpy.types.INFO_MT_file_import.append(menu_func_import)
     bpy.types.INFO_MT_file_export.append(menu_func_export)
-
 
 def unregister():
     bpy.utils.unregister_module(__name__)

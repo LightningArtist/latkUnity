@@ -9,14 +9,6 @@ public class BrushLayer : MonoBehaviour {
 	[HideInInspector] public int currentFrame = 0;
 	[HideInInspector] public int previousFrame = 0;
 
-	void Start() {
-		//
-	}
-	
-	void Update() {
-		//
-	}
-
 	public void reset() {
 		if (frameList != null) {
 			for (int i=0; i<frameList.Count; i++) {
