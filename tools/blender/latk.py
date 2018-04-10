@@ -60,6 +60,69 @@ from bpy_extras.io_utils import (ImportHelper, ExportHelper)
 
 # 2 of 9. TOOLS
 
+def gpWorldRoot(name="Empty"):
+    bpy.ops.object.empty_add(type="PLAIN_AXES")
+    target = ss()
+    target.name = name
+    layers = getAllLayers()
+    for layer in layers:
+        layer.parent = target
+    return target
+    
+def cameraArray(target=None, hideTarget=True, removeCameras=True, removeLayers=True): 
+    if not target:
+        target = ss()
+    if (removeCameras == True):
+    	cams = matchName("Camera")
+    	for cam in cams:
+    		delete(cam)
+    #~
+    scene = bpy.context.scene
+    render = scene.render
+    render.use_multiview = True
+    render.views_format = "MULTIVIEW"
+    #~
+    if (removeLayers == True):
+        while (len(render.views) > 1): # can't delete first layer
+            render.views.remove(render.views[len(render.views)-1])
+        render.views[0].name = "left"
+        render.views.new("right")
+    render.views["left"].use = False
+    render.views["right"].use = False
+    #~
+    coords = [(target.matrix_world * v.co) for v in target.data.vertices]
+    cams = []
+    for coord in coords:
+        cam = createCamera()
+        cam.location = coord
+        cams.append(cam)
+    for i, cam in enumerate(cams):
+        lookAt(cam, target)
+        cam.name = "Camera_" + str(i)
+        renView = render.views.new(cam.name)
+        renView.camera_suffix = "_" + cam.name.split("_")[1]
+        scene.objects.active = cam
+    parentMultiple(cams, target)
+    #~
+    if (hideTarget==True):
+        target.hide = True
+        target.hide_select = False
+        target.hide_render = True
+
+def lookAt(looker, lookee):
+    deselect()
+    select([looker, lookee])
+    lookerPos = looker.matrix_world.to_translation()
+    lookeePos = lookee.matrix_world.to_translation()
+    #~
+    direction = lookeePos - lookerPos
+    #~
+    # point the cameras '-Z' and use its 'Y' as up
+    rot_quat = direction.to_track_quat('-Z', 'Y')
+    #~
+    # assume we're using euler rotation
+    looker.rotation_euler = rot_quat.to_euler()
+    
 def getLayerInfo(layer):
     return layer.info.split(".")[0]
 
@@ -290,6 +353,40 @@ def deleteDuplicateStrokes(fromAllFrames = False):
                     deleteSelected()
             except:
                 pass
+
+def deleteStroke(_stroke):
+    bpy.ops.object.select_all(action='DESELECT')
+    _stroke.select = True
+    deleteSelected()
+
+def deleteStrokes(_strokes):
+    bpy.ops.object.select_all(action='DESELECT')
+    for stroke in _strokes:
+        stroke.select = True
+    deleteSelected()
+
+def selectStrokePoint(_stroke, _index):
+    for i, point in enumerate(_stroke.points):
+        if (i==_index):
+            point.select=True
+        else:
+            point.select=False
+    return _stroke.points[_index]
+
+def selectLastStrokePoint(_stroke):
+    return selectStrokePoint(_stroke, len(_stroke.points)-1)
+
+def getEmptyStrokes(_strokes, _minPoints=0):
+    returns = []
+    for stroke in _strokes:
+        if (len(stroke.points) <= _minPoints):
+            returns.append(stroke)
+    print("Found " + str(len(returns)) + " empty strokes.")
+    return returns
+
+def cleanEmptyStrokes(_strokes, _minPoints=0):
+    target = getEmptyStrokes(_strokes, _minPoints)
+    deleteStrokes(target)
 
 def consolidateGroups():
     wholeNames = []
@@ -1060,6 +1157,13 @@ def createPoint(_stroke, _index, _point, pressure=1, strength=1):
     _stroke.points[_index].pressure = pressure
     _stroke.points[_index].strength = strength
 
+def addPoint(_stroke, _point, pressure=1, strength=1):
+    _stroke.points.add(1)
+    createPoint(_stroke, len(_stroke.points)-1, _point, pressure, strength)
+
+def closeStroke(_stroke):
+    addPoint(_stroke, _stroke.points[0].co)
+
 def createColor(_color):
     frame = getActiveFrame()
     palette = getActivePalette()
@@ -1387,7 +1491,7 @@ def exportForUnity(sketchFab=True):
                 exportName = target[tt].name
                 exportName = exportName.split("crv_")[1]
                 exportName = exportName.split("_mesh")[0]
-                exporter(manualSelect=True, fileType="fbx", name=exportName)
+                exporter(manualSelect=True, fileType="fbx", name=exportName, legacyFbx=True)
                 sketchFabList.append("0.083 " + exportName + ".fbx" + "\r")
                 sketchFabListNum.append(float(exportName.split("_")[len(exportName.split("_"))-1]))
                 break
@@ -1413,7 +1517,7 @@ def exportForUnity(sketchFab=True):
         print(sketchFabList)
         writeTextFile(getFilePath() + getFileName() + "_" + tempString + ".sketchfab.timeframe", sketchFabList)
 
-def exporter(name="test", url=None, winDir=False, manualSelect=False, fileType="fbx"):
+def exporter(name="test", url=None, winDir=False, manualSelect=False, fileType="fbx", legacyFbx=False):
     if not url:
         url = getFilePath()
         if (winDir==True):
@@ -1423,7 +1527,10 @@ def exporter(name="test", url=None, winDir=False, manualSelect=False, fileType="
     #~
     if (manualSelect == True):
             if (fileType=="fbx"):
-                bpy.ops.export_scene.fbx(filepath=url + name + ".fbx", use_selection=True)
+                if (legacyFbx == True):
+                    bpy.ops.export_scene.fbx(filepath=url + name + ".fbx", use_selection=True, version="ASCII6100") # legacy version
+                else:
+                    bpy.ops.export_scene.fbx(filepath=url + name + ".fbx", use_selection=True, version="BIN7400")
             else:
                 bpy.ops.export_scene.obj(filepath=url + name + ".obj", use_selection=True)
     else:
@@ -1436,7 +1543,10 @@ def exporter(name="test", url=None, winDir=False, manualSelect=False, fileType="
             #bpy.context.scene.update()
             #~
             if (fileType=="fbx"):
-                bpy.ops.export_scene.fbx(filepath=url + name + "_" + str(j) + ".fbx", use_selection=True)
+                if (legacyFbx == True):
+                    bpy.ops.export_scene.fbx(filepath=url + name + "_" + str(j) + ".fbx", use_selection=True, version="ASCII6100") # legacy version
+                else:
+                    bpy.ops.export_scene.fbx(filepath=url + name + "_" + str(j) + ".fbx", use_selection=True, version="BIN7400")
             else:
                 bpy.ops.export_scene.obj(filepath=url + name + "_" + str(j) + ".obj", use_selection=True)
 
@@ -1868,6 +1978,53 @@ def painterPoint(point):
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
+def importNorman(filepath=None):
+    globalScale = Vector((1, 1, 1))
+    globalOffset = Vector((0, 0, 0))
+    useScaleAndOffset = True
+    numPlaces = 7
+    roundValues = True
+    #~
+    with open(filepath) as data_file: 
+        data = json.load(data_file)
+    #~
+    frames = []    
+    for i in range(0, len(data["data"])):
+        strokes = []
+        for j in range(0, len(data["data"][i])):
+            points = []
+            for k in range(0, len(data["data"][i][j])):
+                points.append((data["data"][i][j][k]["x"], data["data"][i][j][k]["y"], data["data"][i][j][k]["z"]))
+            strokes.append(points)
+        frames.append(strokes)
+    #~
+    gp = getActiveGp()
+    layer = gp.layers.new("Norman_layer", set_active=True)
+    for i in range(0, len(frames)):
+        frame = layer.frames.new(i)
+        for j in range(0, len(frames[i])):
+            strokeColor = (0.5,0.5,0.5)
+            createColor(strokeColor)
+            stroke = frame.strokes.new(getActiveColor().name)
+            stroke.draw_mode = "3DSPACE" # either of ("SCREEN", "3DSPACE", "2DSPACE", "2DIMAGE")
+            stroke.points.add(len(frames[i][j])) # add 4 points
+            for l in range(0, len(frames[i][j])):
+                x = 0.0
+                y = 0.0
+                z = 0.0
+                pressure = 1.0
+                strength = 1.0
+                if useScaleAndOffset == True:
+                    x = (frames[i][j][l][0] * globalScale.x) + globalOffset.x
+                    y = (frames[i][j][l][2] * globalScale.y) + globalOffset.y
+                    z = (frames[i][j][l][1] * globalScale.z) + globalOffset.z
+                else:
+                    x = frames[i][j][l][0]
+                    y = frames[i][j][l][2]
+                    z = frames[i][j][l][1]
+                #~
+                createPoint(stroke, l, (x, y, z), pressure, strength)
+
 #def gmlParser(filepath=None, globalScale=(0.1,0.1,0.1), useTime=True):
 def gmlParser(filepath=None, splitStrokes=True):
     globalScale = (1, 1, 1)
@@ -1907,16 +2064,16 @@ def gmlParser(filepath=None, splitStrokes=True):
     if environment:
         upEl = environment.find("up")
         if (upEl):
-        	up = (float(upEl.find("x").text), float(upEl.find("y").text), float(upEl.find("z").text))
+            up = (float(upEl.find("x").text), float(upEl.find("y").text), float(upEl.find("z").text))
         screenBoundsEl = environment.find("screenBounds")
         if (screenBoundsEl):
             sbX = float(screenBoundsEl.find("x").text)
             sbY = float(screenBoundsEl.find("y").text)
             sbZ = 1.0
             try:
-            	sbZ = float(screenBoundsEl.find("z").text)
+                sbZ = float(screenBoundsEl.find("z").text)
             except:
-            	pass
+                pass
             screenBounds = (sbX, sbY, sbZ)
     globalScale = (globalScale[0] * screenBounds[0], globalScale[1] * screenBounds[1], globalScale[2] * screenBounds[2])
     #~
@@ -1938,12 +2095,12 @@ def gmlParser(filepath=None, splitStrokes=True):
             try:
                 z = float(pt.find("z").text) * globalScale[2]
             except:
-            	pass
+                pass
             time = 0.0
             try:
-            	time = float(pt.find("time").text)
+                time = float(pt.find("time").text)
             except:
-            	pass
+                pass
             #if (yUp==False):
             gmlPoints.append((x,y,z,time))
             #else:
@@ -2199,6 +2356,18 @@ def getAllTags(name=None, xml=None):
             returns.append(node)
     return returns
 
+def writePointCloud(name=None, strokes=None):
+    if not strokes:
+        strokes = getSelectedStrokes()
+    lines = []
+    for stroke in strokes:
+        for point in stroke.points:
+            x = str(point.co[0])
+            y = str(point.co[1])
+            z = str(point.co[2])
+            lines.append(x + ", " + y + ", " + z + "\n")
+    writeTextFile(name=name, lines=lines)
+
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
 # * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -2232,7 +2401,7 @@ def colorVertexCyclesMat(obj):
     nodes = obj.active_material.node_tree.nodes
     material_output = nodes.get('Diffuse BSDF')
     nodeAttr = nodes.new("ShaderNodeAttribute")
-    nodeAttr.attribute_name = "Col"
+    nodeAttr.attribute_name = "Cd"
     obj.active_material.node_tree.links.new(material_output.inputs[0], nodeAttr.outputs[0])
     #~
     #loop through each vertex
@@ -2528,8 +2697,11 @@ def assembleMesh(export=False, createPalette=True):
             saveFile(origFileName + "_ASSEMBLY")
             print(origFileName + "_ASSEMBLY.blend" + " was saved but some groups were missing.")
 
-def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=False, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=False, _animateFrames=True, _solidify=False, _subd=0, _remesh="none", _consolidateMtl=True, _caps=True, _joinMesh=True, _uvStroke=False, _uvFill=False):
-    if (_joinMesh==True or _remesh==True):
+def gpMeshQ(val = 0.1):
+    gpMesh(_decimate=val, _saveLayers=True)
+
+def gpMesh(_thickness=0.1, _resolution=1, _bevelResolution=0, _bakeMesh=True, _decimate = 0.1, _curveType="nurbs", _useColors=True, _saveLayers=False, _singleFrame=False, _vertexColors=True, _animateFrames=True, _solidify=False, _subd=0, _remesh="none", _consolidateMtl=True, _caps=True, _joinMesh=True, _uvStroke=True, _uvFill=True):
+    if (_joinMesh==True or _remesh != "none"):
         _bakeMesh=True
     #~
     if (_saveLayers==True):
@@ -2889,7 +3061,7 @@ def colorVertices(obj, color=(1,0,0), makeMaterial=False):
     mesh = obj.data
     #~
     if not mesh.vertex_colors:
-        mesh.vertex_colors.new()
+        mesh.vertex_colors.new("rgba") # .new()
     #~
     """
     let us assume for sake of brevity that there is now 
@@ -2905,7 +3077,11 @@ def colorVertices(obj, color=(1,0,0), makeMaterial=False):
     for poly in mesh.polygons:
         for idx in poly.loop_indices:
             #rgb = [random.random() for i in range(3)]
-            color_layer.data[i].color = color #rgb
+            #color_layer.data[i].color = rgb
+            try:
+                color_layer.data[i].color = (color[0], color[1], color[2], 1) # future-proofing 2.79a
+            except:
+                color_layer.data[i].color = color # 2.79 and earlier
             i += 1
     #~
     if (makeMaterial==True):
@@ -2955,14 +3131,14 @@ def makeCurve(coords, pressures, resolution=2, thickness=0.1, bevelResolution=1,
     curveType=curveType.upper()
     polyline = curveData.splines.new(curveType)
     if (curveType=="NURBS"):
-        polyline.points.add(len(coords)-1)
+        polyline.points.add(len(coords))#-1)
         for i, coord in enumerate(coords):
             x,y,z = coord
             polyline.points[i].co = (x, y, z, 1) 
             if (pressures != None):
                 polyline.points[i].radius = pressures[i]   
     elif (curveType=="BEZIER"):
-        polyline.bezier_points.add(len(coords)-1)
+        polyline.bezier_points.add(len(coords))#-1)
         #polyline.bezier_points.foreach_set("co", unpack_list(coords))
         for i, coord in enumerate(coords):
             polyline.bezier_points[i].co = coord   
@@ -3489,6 +3665,28 @@ class ExportLatk(bpy.types.Operator, ExportHelper):
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
 
+class ImportNorman(bpy.types.Operator, ImportHelper):
+    """Load a Norman File"""
+    bl_idname = "import_scene.norman"
+    bl_label = "Import Norman"
+    bl_options = {'PRESET', 'UNDO'}
+
+    filename_ext = ".json"
+    filter_glob = StringProperty(
+            default="*.json",
+            options={'HIDDEN'},
+            )
+
+    def execute(self, context):
+        import latk as la
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob", "split_mode"))
+        if bpy.data.is_saved and context.user_preferences.filepaths.use_relative_paths:
+            import os
+            #keywords["relpath"] = os.path.dirname(bpy.data.filepath)
+        #~
+        la.importNorman(**keywords)
+        return {'FINISHED'} 
+
 class ImportGml(bpy.types.Operator, ImportHelper):
     """Load a Gml File"""
     bl_idname = "import_scene.gml"
@@ -3601,13 +3799,14 @@ class ExportPainter(bpy.types.Operator, ExportHelper):
 
 def menu_func_import(self, context):
     self.layout.operator(ImportLatk.bl_idname, text="Latk Animation (.json)")
-    self.layout.operator(ImportGml.bl_idname, text="Graffiti Markup Language (.gml)")
+    self.layout.operator(ImportGml.bl_idname, text="Latk - GML (.gml)")
+    self.layout.operator(ImportNorman.bl_idname, text="Latk - Norman (.json)")
 
 def menu_func_export(self, context):
     self.layout.operator(ExportLatk.bl_idname, text="Latk Animation (.json)")
-    #self.layout.operator(ExportGml.bl_idname, text="Graffiti Markup Language (.gml)")
-    self.layout.operator(ExportSvg.bl_idname, text="SVG SMIL Animation (.svg)")
-    self.layout.operator(ExportPainter.bl_idname, text="Corel Painter Script (.txt)")
+    #self.layout.operator(ExportGml.bl_idname, text="Latk - GML (.gml)")
+    self.layout.operator(ExportSvg.bl_idname, text="Latk - SVG SMIL (.svg)")
+    self.layout.operator(ExportPainter.bl_idname, text="Latk - Corel Painter (.txt)")
 
 def register():
     bpy.utils.register_module(__name__)
