@@ -46,7 +46,7 @@ Category {
 			#include "UnityCG.cginc"
 			#include "../../../Shaders/Include/Brush.cginc"
 			#include "../../../Shaders/Include/Particles.cginc"
-			#include "Assets/LightningArtist/ThirdParty/TiltBrush/ThirdParty/Noise/Shaders/Noise.cginc"
+			#include "../../../../../../ThirdParty/TiltBrush/ThirdParty/Noise/Shaders/Noise.cginc"
 
 			sampler2D _MainTex;
 			fixed4 _TintColor;
