@@ -174,7 +174,7 @@ Prefab:
       objectReference: {fileID: 387278315}
     - target: {fileID: 11437508, guid: bd6b520ae512fe14284192c59b70f0f3, type: 2}
       propertyPath: readFileName
-      value: LightningArtist/Example/Animations/layer_test.json
+      value: latkUnity/Example/Animations/layer_test.json
       objectReference: {fileID: 0}
     - target: {fileID: 11437508, guid: bd6b520ae512fe14284192c59b70f0f3, type: 2}
       propertyPath: readOnStart
@@ -570,7 +570,7 @@ MonoBehaviour:
   walkSpeed: 2
   runSpeed: 20
   accel: 0.002
-  useYAxis: 1
+  useYAxis: 0
   yAxisName: Vertical2
   homePoint: {x: 0, y: 0, z: 0}
 --- !u!114 &841338263
