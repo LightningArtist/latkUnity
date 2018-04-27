@@ -153,7 +153,7 @@ public class LightningArtist : MonoBehaviour {
             armReadFile = true;
         }
 
-        brushSizeDelta = brushSize / 100f;
+        brushSizeDelta = brushSize / 50f;
     }
 
     void Update() {
@@ -166,6 +166,8 @@ public class LightningArtist : MonoBehaviour {
             StartCoroutine(writeLatkStrokes());
             armWriteFile = false;
         } else if (!isReadingFile && !isWritingFile) {
+            if (useCollisions) updateCollision();
+
             for (int i = 0; i < layerList.Count; i++) {
                 if (layerList[i].frameList.Count > 0 && !layerList[i].frameList[layerList[i].currentFrame].isDuplicate) {
                     layerList[i].previousFrame = layerList[i].currentFrame;
@@ -564,119 +566,113 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("*** Begin writing...");
         isWritingFile = true;
 
-        ArrayList FINAL_LAYER_LIST = new ArrayList();
+        List<string> FINAL_LAYER_LIST = new List<string>();
 
-        for (int fllA = 0; fllA < layerList.Count; fllA++) {
-            currentLayer = fllA;
+        for (int hh = 0; hh < layerList.Count; hh++) {
+            currentLayer = hh;
 
-            ArrayList sb = new ArrayList();
-            ArrayList sbHeaderL = new ArrayList();
-            string sbHeader = "                    \"frames\":[" + "\n";
-            sbHeaderL.Add(sbHeader);
-            sb.Add(sbHeaderL);
+            List<string> sb = new List<string>();
+            List<string> sbHeader = new List<string>();
+            sbHeader.Add("\t\t\t\t\t\"frames\":[");
+            sb.Add(string.Join("\n", sbHeader.ToArray()));
 
             for (int h = 0; h < layerList[currentLayer].frameList.Count; h++) {
                 Debug.Log("Starting frame " + (layerList[currentLayer].currentFrame + 1) + ".");
                 layerList[currentLayer].currentFrame = h;
 
-                ArrayList sbbHeaderL = new ArrayList();
-                string sbbHeader = "                        {" + "\n";
-                sbbHeader += "                            \"strokes\":[" + "\n";
-                sbbHeaderL.Add(sbbHeader);
-                sb.Add(sbbHeaderL);
+                List<string> sbbHeader = new List<string>();
+                sbbHeader.Add("\t\t\t\t\t\t{");
+                sbbHeader.Add("\t\t\t\t\t\t\t\"strokes\":[");
+                sb.Add(string.Join("\n", sbbHeader.ToArray()));
                 for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
-                    ArrayList sbbL = new ArrayList();
-                    string sbb = "                                {" + "\n";
+                    List<string> sbb = new List<string>();
+                    sbb.Add("\t\t\t\t\t\t\t\t{");
                     float r = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.r;
                     float g = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.g;
                     float b = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.b;
-                    sbb += "                                    \"color\":[" + r + ", " + g + ", " + b + "]," + "\n";
+                    sbb.Add("\t\t\t\t\t\t\t\t\t\"color\":[" + r + ", " + g + ", " + b + "],");
 
                     if (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count > 0) {
-                        sbb += "                                    \"points\":[" + "\n";
+                        sbb.Add("\t\t\t\t\t\t\t\t\t\"points\":[");
                         for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
                             float x = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].x;
                             float y = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y;
                             float z = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z;
 
                             if (j == layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count - 1) {
-                                sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}" + "\n";
-                                sbb += "                                    ]" + "\n";
+                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}");
+                                sbb.Add("\t\t\t\t\t\t\t\t\t]");
                             } else {
-                                sbb += "                                        {\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}," + "\n";
+                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1},");
                             }
                         }
                     } else {
-                        sbb += "                                    \"points\":[]" + "\n";
+                        sbb.Add("\t\t\t\t\t\t\t\t\t\"points\":[]");
                     }
 
                     if (i == layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1) {
-                        sbb += "                                }" + "\n";
+                        sbb.Add("\t\t\t\t\t\t\t\t}");
                     } else {
-                        sbb += "                                }," + "\n";
+                        sbb.Add("\t\t\t\t\t\t\t\t},");
                     }
 
                     Debug.Log("Adding frame " + (layerList[currentLayer].currentFrame + 1) + ": stroke " + (i + 1) + " of " + layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count + ".");
 
-                    sbbL.Add(sbb);
-                    sb.Add(sbbL);
+                    sb.Add(string.Join("\n", sbb.ToArray()));
                 }
 
                 if (textMesh != null) textMesh.text = "WRITING " + (layerList[currentLayer].currentFrame + 1) + " / " + layerList[currentLayer].frameList.Count;
                 Debug.Log("Ending frame " + (layerList[currentLayer].currentFrame + 1) + ".");
                 yield return new WaitForSeconds(consoleUpdateInterval);
 
-                ArrayList sbFooterL = new ArrayList();
-                string sbFooter = "";
+                List<string> sbFooter = new List<string>();
                 if (h == layerList[currentLayer].frameList.Count - 1) {
-                    sbFooter += "                            ]" + "\n";
-                    sbFooter += "                        }" + "\n";
+                    sbFooter.Add("\t\t\t\t\t\t\t]");
+                    sbFooter.Add("\t\t\t\t\t\t}");
                 } else {
-                    sbFooter += "                            ]" + "\n";
-                    sbFooter += "                        }," + "\n";
+                    sbFooter.Add("\t\t\t\t\t\t\t]");
+                    sbFooter.Add("\t\t\t\t\t\t},");
                 }
-                sbFooterL.Add(sbFooter);
-                sb.Add(sbFooterL);
+                sb.Add(string.Join("\n", sbFooter.ToArray()));
             }
 
-            FINAL_LAYER_LIST.Add(sb);
+            FINAL_LAYER_LIST.Add(string.Join("\n", sb.ToArray()));
         }
 
         yield return new WaitForSeconds(consoleUpdateInterval);
         Debug.Log("+++ Parsing finished. Begin file writing.");
         yield return new WaitForSeconds(consoleUpdateInterval);
 
-        string s = "{" + "\n";
-        s += "    \"creator\": \"unity\"," + "\n";
-        s += "    \"grease_pencil\":[" + "\n";
-        s += "        {" + "\n";
-        s += "            \"layers\":[" + "\n";
+        List<string> s = new List<string>();
+        s.Add("{");
+        s.Add("\t\"creator\": \"unity\",");
+        s.Add("\t\"grease_pencil\":[");
+        s.Add("\t\t{");
+        s.Add("\t\t\t\"layers\":[");
 
-        for (int fllB = 0; fllB < layerList.Count; fllB++) {
-            s += "                {" + "\n";
-            if (layerList[fllB].name != null && layerList[fllB].name != "") {
-                s += "                    \"name\": \"" + layerList[fllB].name + "\"," + "\n";
+        for (int i = 0; i < layerList.Count; i++) {
+            currentLayer = i;
+
+            s.Add("\t\t\t\t{");
+            if (layerList[currentLayer].name != null && layerList[currentLayer].name != "") {
+                s.Add("\t\t\t\t\t\"name\": \"" + layerList[currentLayer].name + "\",");
             } else {
-                s += "                    \"name\": \"UnityLayer " + (fllB + 1) + "\"," + "\n";
+                s.Add("\t\t\t\t\t\"name\": \"UnityLayer " + (currentLayer + 1) + "\",");
             }
-            ArrayList sb_y = (ArrayList)FINAL_LAYER_LIST[fllB];
-            for (int zx = 0; zx < sb_y.Count; zx++) {
-                ArrayList x = (ArrayList)sb_y[zx];
-                for (int zzx = 0; zzx < x.Count; zzx++) {
-                    s += x[zzx];
-                }
-            }
-            s += "                    ]" + "\n";
-            if (fllB < layerList.Count - 1) {
-                s += "                }," + "\n";
+
+            s.Add(FINAL_LAYER_LIST[currentLayer]);
+
+            s.Add("\t\t\t\t\t]");
+            if (currentLayer < layerList.Count - 1) {
+                s.Add("\t\t\t\t},");
             } else {
-                s += "                }" + "\n";
+                s.Add("\t\t\t\t}");
             }
         }
-        s += "            ]" + "\n"; // end layers
-        s += "        }" + "\n";
-        s += "    ]" + "\n";
-        s += "}" + "\n";
+        s.Add("            ]"); // end layers
+        s.Add("        }");
+        s.Add("    ]");
+        s.Add("}");
 
         string url = "";
         if (useTimestamp) {
@@ -705,7 +701,7 @@ public class LightningArtist : MonoBehaviour {
 #endif
         }
 
-        File.WriteAllText(url, s);
+        File.WriteAllText(url, string.Join("\n", s.ToArray()));
         Debug.Log("*** Wrote " + url);
         isWritingFile = false;
 
@@ -713,7 +709,7 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doErase() {
-        isPlaying = false;
+        //isPlaying = false;
 
         int strokeToDelete = -1;
 
@@ -744,7 +740,7 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doPush() {
-        isPlaying = false;
+        //isPlaying = false;
 
         for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
             for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
@@ -757,7 +753,7 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doColorPick() {
-        isPlaying = false;
+        //isPlaying = false;
 
         for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
             for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
@@ -949,7 +945,35 @@ public class LightningArtist : MonoBehaviour {
 
     public bool useCollisions = false;
     [HideInInspector] public Vector3 lastHit = Vector3.zero;
+    [HideInInspector] public Vector3 thisHit = Vector3.zero;
 
+    public void updateCollision() {
+        RaycastHit hit;
+        Ray ray;
+
+        ray = new Ray(target.position, target.forward);
+
+        if (Physics.Raycast(ray, out hit)) {
+            thisHit = hit.point;
+        } else {
+            thisHit = Vector3.zero;
+        }
+    }
+
+    public Vector3 getCollision() {
+        if (thisHit != Vector3.zero) {
+            if (lastHit == Vector3.zero || Vector3.Distance(thisHit, lastHit) < (10f * scaleRef.localScale.z)) {// brushSize) {
+                lastHit = Vector3.Lerp(thisHit, Camera.main.transform.position, 0.02f);
+                return lastHit;
+            } else {
+                return Vector3.zero;
+            }
+        } else {
+            return Vector3.zero;
+        }
+    }
+
+    /*
     public Vector3 getCollision() {
         RaycastHit hit;
         Ray ray;
@@ -968,6 +992,7 @@ public class LightningArtist : MonoBehaviour {
             return Vector3.zero;
         }
     }
+    */
 
     public LatkFrame getLastFrame() {
         LatkLayer layer = layerList[currentLayer];
