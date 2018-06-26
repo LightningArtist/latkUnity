@@ -7,7 +7,7 @@ The Lightning Artist Toolkit was developed with support from:
    Ontario Arts Council
    Toronto Arts Council
    
-Copyright (c) 2017 Nick Fox-Gieg
+Copyright (c) 2018 Nick Fox-Gieg
 http://fox-gieg.com
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -30,6 +30,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using SimpleJSON;
+using ICSharpCode.SharpZipLib.Core;
+using ICSharpCode.SharpZipLib.Zip;
 
 public class LightningArtist : MonoBehaviour {
 
@@ -115,6 +117,8 @@ public class LightningArtist : MonoBehaviour {
 
     private Matrix4x4 transformMatrix;
     private Matrix4x4 cameraTransformMatrix;
+
+    private bool useZip = false;
 
     public void updateTransformMatrix() {
         transformMatrix = Matrix4x4.TRS(transform.position, transform.rotation, transform.localScale);
@@ -447,6 +451,14 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("*** Begin reading...");
         isReadingFile = true;
 
+        string ext = Path.GetExtension(readFileName).ToLower();
+        Debug.Log("Found extension " + ext);
+        if (ext == ".latk" || ext == ".zip") {
+            useZip = true;
+        } else {
+            useZip = false;
+        }
+
         for (int h = 0; h < layerList.Count; h++) {
             for (int i = 0; i < layerList[h].frameList.Count; i++) {
                 Destroy(layerList[h].frameList[i].gameObject);
@@ -457,29 +469,29 @@ public class LightningArtist : MonoBehaviour {
 
         string url;
 
-#if UNITY_ANDROID
+        #if UNITY_ANDROID
 		url = Path.Combine("jar:file://" + Application.dataPath + "!/assets/", readFileName);
-#endif
+        #endif
 
-#if UNITY_IOS
+        #if UNITY_IOS
 		url = Path.Combine("file://" + Application.dataPath + "/Raw", readFileName);
-#endif
+        #endif
 
-#if UNITY_EDITOR
+        #if UNITY_EDITOR
         url = Path.Combine("file://" + Application.dataPath, readFileName);
-#endif
+        #endif
 
-#if UNITY_STANDALONE_WIN
+        #if UNITY_STANDALONE_WIN
         url = Path.Combine("file://" + Application.dataPath, readFileName);
-#endif
+        #endif
 
-#if UNITY_STANDALONE_OSX
+        #if UNITY_STANDALONE_OSX
 		url = Path.Combine("file://" + Application.dataPath, readFileName);		
-#endif
+        #endif
 
-#if UNITY_WSA
+        #if UNITY_WSA
 		url = Path.Combine("file://" + Application.dataPath, readFileName);		
-#endif
+        #endif
 
         WWW www = new WWW(url);
         yield return www;
@@ -487,7 +499,11 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("+++ File reading finished. Begin parsing...");
         yield return new WaitForSeconds(consoleUpdateInterval);
 
-        jsonNode = JSON.Parse(www.text);
+        if (useZip) {
+            jsonNode = getJsonFromZip(www.bytes);
+        } else {
+            jsonNode = JSON.Parse(www.text);
+        }
 
         for (int f = 0; f < jsonNode["grease_pencil"][0]["layers"].Count; f++) {
             instantiateLayer();
@@ -1008,6 +1024,25 @@ public class LightningArtist : MonoBehaviour {
     public Vector3 getLastPoint() {
         LatkStroke stroke = getLastStroke();
         return stroke.points[stroke.points.Count - 1];
+    }
+
+    JSONNode getJsonFromZip(byte[] bytes) {
+        // https://gist.github.com/r2d2rigo/2bd3a1cafcee8995374f
+
+        MemoryStream fileStream = new MemoryStream(bytes, 0, bytes.Length);
+        ZipFile zipFile = new ZipFile(fileStream);
+
+        foreach (ZipEntry entry in zipFile) {
+            if (Path.GetExtension(entry.Name).ToLower() == ".json") {
+                Stream zippedStream = zipFile.GetInputStream(entry);
+                StreamReader read = new StreamReader(zippedStream, true);
+                string json = read.ReadToEnd();
+                Debug.Log(json);
+                return JSON.Parse(json);
+            }
+        }
+
+        return null;
     }
 
 }
