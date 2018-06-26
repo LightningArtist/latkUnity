@@ -118,8 +118,6 @@ public class LightningArtist : MonoBehaviour {
     private Matrix4x4 transformMatrix;
     private Matrix4x4 cameraTransformMatrix;
 
-    private bool useZip = false;
-
     public void updateTransformMatrix() {
         transformMatrix = Matrix4x4.TRS(transform.position, transform.rotation, transform.localScale);
     }
@@ -453,11 +451,7 @@ public class LightningArtist : MonoBehaviour {
 
         string ext = Path.GetExtension(readFileName).ToLower();
         Debug.Log("Found extension " + ext);
-        if (ext == ".latk" || ext == ".zip") {
-            useZip = true;
-        } else {
-            useZip = false;
-        }
+        bool useZip = (ext == ".latk" || ext == ".zip");
 
         for (int h = 0; h < layerList.Count; h++) {
             for (int i = 0; i < layerList[h].frameList.Count; i++) {
@@ -582,6 +576,10 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("*** Begin writing...");
         isWritingFile = true;
 
+        string ext = Path.GetExtension(writeFileName).ToLower();
+        Debug.Log("Found extension " + ext);
+        bool useZip = (ext == ".latk" || ext == ".zip");
+
         List<string> FINAL_LAYER_LIST = new List<string>();
 
         for (int hh = 0; hh < layerList.Count; hh++) {
@@ -691,33 +689,35 @@ public class LightningArtist : MonoBehaviour {
         s.Add("}");
 
         string url = "";
+        string tempName = "";
         if (useTimestamp) {
-            string ext = ".json";
-            string tempName = writeFileName.Replace(ext, "");
+            string extO = "";
+            if (useZip) {
+                extO = ".latk";
+            } else {
+                extO = ".json";
+            }
+            tempName = writeFileName.Replace(extO, "");
             int timestamp = (int)(System.DateTime.UtcNow.Subtract(new System.DateTime(1970, 1, 1))).TotalSeconds;
-            tempName += "_" + timestamp + ext;
-            url = Path.Combine(Application.dataPath, tempName);
-
-#if UNITY_ANDROID
-			url = "/sdcard/Movies/" + tempName;
-#endif
-
-#if UNITY_IOS
-			url = Path.Combine(Application.persistentDataPath, tempName);
-#endif
-        } else {
-            url = Path.Combine(Application.dataPath, writeFileName);
-
-#if UNITY_ANDROID
-			url = "/sdcard/Movies/" + writeFileName;
-#endif
-
-#if UNITY_IOS
-			url = Path.Combine(Application.persistentDataPath, writeFileName);
-#endif
+            tempName += "_" + timestamp + extO;
         }
 
-        File.WriteAllText(url, string.Join("\n", s.ToArray()));
+        url = Path.Combine(Application.dataPath, tempName);
+
+        #if UNITY_ANDROID
+		url = "/sdcard/Movies/" + tempName;
+        #endif
+
+        #if UNITY_IOS
+		url = Path.Combine(Application.persistentDataPath, tempName);
+        #endif
+
+        if (useZip) {
+            saveJsonAsZip(url, tempName, string.Join("\n", s.ToArray()));
+        } else {
+            File.WriteAllText(url, string.Join("\n", s.ToArray()));
+        }
+
         Debug.Log("*** Wrote " + url);
         isWritingFile = false;
 
@@ -1043,6 +1043,59 @@ public class LightningArtist : MonoBehaviour {
         }
 
         return null;
+    }
+
+    void saveJsonAsZip(string url, string fileName, string s) {
+        // https://stackoverflow.com/questions/1879395/how-do-i-generate-a-stream-from-a-string
+        // https://github.com/icsharpcode/SharpZipLib/wiki/Zip-Samples
+        // https://stackoverflow.com/questions/8624071/save-and-load-memorystream-to-from-a-file
+
+        MemoryStream memStreamIn = new MemoryStream();
+        StreamWriter writer = new StreamWriter(memStreamIn);
+        writer.Write(s);
+        writer.Flush();
+        memStreamIn.Position = 0;
+
+        MemoryStream outputMemStream = new MemoryStream();
+        ZipOutputStream zipStream = new ZipOutputStream(outputMemStream);
+
+        zipStream.SetLevel(3); //0-9, 9 being the highest level of compression
+
+        string fileNameMinusExtension = "";
+        string[] nameTemp = fileName.Split('.');
+        for (int i = 0; i < nameTemp.Length - 1; i++) {
+            fileNameMinusExtension += nameTemp[i];
+        }
+
+        ZipEntry newEntry = new ZipEntry(fileNameMinusExtension + ".json");
+        newEntry.DateTime = System.DateTime.Now;
+
+        zipStream.PutNextEntry(newEntry);
+
+        StreamUtils.Copy(memStreamIn, zipStream, new byte[4096]);
+        zipStream.CloseEntry();
+
+        zipStream.IsStreamOwner = false;    // False stops the Close also Closing the underlying stream.
+        zipStream.Close();          // Must finish the ZipOutputStream before using outputMemStream.
+
+        outputMemStream.Position = 0;
+
+        using (FileStream file = new FileStream(url, FileMode.Create, System.IO.FileAccess.Write)) {
+            byte[] bytes = new byte[outputMemStream.Length];
+            outputMemStream.Read(bytes, 0, (int)outputMemStream.Length);
+            file.Write(bytes, 0, bytes.Length);
+            outputMemStream.Close();
+        }
+
+        /*
+        // Alternative outputs:
+        // ToArray is the cleaner and easiest to use correctly with the penalty of duplicating allocated memory.
+        byte[] byteArrayOut = outputMemStream.ToArray();
+
+        // GetBuffer returns a raw buffer raw and so you need to account for the true length yourself.
+        byte[] byteArrayOut = outputMemStream.GetBuffer();
+        long len = outputMemStream.Length;
+        */
     }
 
 }
