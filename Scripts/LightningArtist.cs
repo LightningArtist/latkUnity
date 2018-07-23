@@ -461,7 +461,7 @@ public class LightningArtist : MonoBehaviour {
         }
         layerList = new List<LatkLayer>();
 
-        string url;
+        string url = "";
 
         #if UNITY_ANDROID
 		url = Path.Combine("jar:file://" + Application.dataPath + "!/assets/", readFileName);
