@@ -923,6 +923,13 @@ public class LightningArtist : MonoBehaviour {
         if (currentLayer > layerList.Count - 1) currentLayer = 0;
     }
 
+    public void inputPreviousLayer() {
+        showOnionSkin = false;
+        inputHideFrames();
+        currentLayer--;
+        if (currentLayer < 0) currentLayer = layerList.Count - 1;
+    }
+
     public void inputNewLayer() {
         showOnionSkin = false;
         inputHideFrames();
