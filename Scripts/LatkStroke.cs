@@ -23,10 +23,11 @@ public class LatkStroke : MonoBehaviour {
     private int splitReps = 2;
     private int smoothReps = 10;
     private int reduceReps = 0;
-    private float simplifyTolerance = 0.001f;
+    private float simplifyTolerance = 0.0001f;
     private MeshFilter mf;
     private Mesh mesh;
     private MeshRenderer meshRen;
+    private bool armSimplify = false;
 
     private void Awake() {
         lineRen = GetComponent<LineRenderer>();
@@ -37,6 +38,8 @@ public class LatkStroke : MonoBehaviour {
             mesh = new Mesh();
             meshRen = GetComponent<MeshRenderer>();
         } catch (UnityException e) { }
+
+        simplifyTolerance = brushSize / 10f;
     }
 
     void Start() {
@@ -47,6 +50,7 @@ public class LatkStroke : MonoBehaviour {
 
 	void Update() {
 		if (isDirty) refresh();
+        if (armSimplify) simplify();
 	}
 
 	public void refresh() {
@@ -77,12 +81,14 @@ public class LatkStroke : MonoBehaviour {
 	}
 
 	public void setBrushSize() {
-        lineRen.widthMultiplier = brushSize;
+        lineRen.startWidth = lineRen.endWidth = brushSize;
+        //lineRen.widthMultiplier = brushSize;
     }
 
 	public void setBrushSize(float f) {
 		brushSize = f;
-        lineRen.widthMultiplier = brushSize;
+        lineRen.startWidth = lineRen.endWidth = brushSize;
+        //lineRen.widthMultiplier = brushSize;
     }
 
     public void setBrushColor() {
@@ -157,7 +163,6 @@ public class LatkStroke : MonoBehaviour {
     }
 
     public void refine() {
-        /*
         for (int i = 0; i < splitReps; i++) {
             points = splitStroke(points);
             points = smoothStroke(points);
@@ -168,14 +173,16 @@ public class LatkStroke : MonoBehaviour {
         for (int i = 0; i < reduceReps; i++) {
             points = reduceStroke(points);
         }
-        */
+        isDirty = true;
+    }
 
+    public void simplify() { 
         lineRen.Simplify(simplifyTolerance);
 
         Vector3[] temp = new Vector3[lineRen.positionCount];
         lineRen.GetPositions(temp);
         points = new List<Vector3>(temp);
-        isDirty = true;
+        armSimplify = false;
     }
 
     public void randomize(float spread) {

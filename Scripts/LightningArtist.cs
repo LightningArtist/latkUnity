@@ -53,6 +53,7 @@ public class LightningArtist : MonoBehaviour {
     public int drawTrailLength = 4;
     public float strokeLife = 5f;
     public bool killStrokes = false;
+    public bool writePressure = false;
 
     public string readFileName = "LatkStrokes-saved.json";
     public bool readOnStart = false;
@@ -102,6 +103,7 @@ public class LightningArtist : MonoBehaviour {
     private float markTime = 0f;
     public float frameBrightNormal = 0.5f;
     public float frameBrightDim = 0.05f;
+    private Vector2 brushSizeRange = new Vector2(0f, 1f);
 
     private float normalizedFrameInterval = 0f;
     private string clipName = "Take 001";
@@ -445,6 +447,29 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("layerList has " + layerList.Count + " layers.");
     }
 
+    void getBrushSizeRange() {
+        List<float> allBrushSizes = new List<float>();
+
+        for (int i=0; i<layerList.Count; i++) {
+            for (int j=0; j<layerList[i].frameList.Count; j++) {
+                for (int k=0; k<layerList[i].frameList[j].brushStrokeList.Count; k++) {
+                    allBrushSizes.Add(layerList[i].frameList[j].brushStrokeList[k].brushSize);
+                }
+            }
+        }
+
+        allBrushSizes.Sort();
+        brushSizeRange = new Vector2(allBrushSizes[0], allBrushSizes[allBrushSizes.Count-1]);
+    }
+
+    float getNormalizedBrushSize(float s) {
+        return map(s, brushSizeRange.x, brushSizeRange.y, 0f, 1f);
+    }
+
+    float map(float s, float a1, float a2, float b1, float b2) {
+        return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
+    }
+
     public IEnumerator readLatkStrokes() {
         Debug.Log("*** Begin reading...");
         isReadingFile = true;
@@ -582,6 +607,8 @@ public class LightningArtist : MonoBehaviour {
 
         List<string> FINAL_LAYER_LIST = new List<string>();
 
+        if (writePressure) getBrushSizeRange();
+
         for (int hh = 0; hh < layerList.Count; hh++) {
             currentLayer = hh;
 
@@ -613,11 +640,14 @@ public class LightningArtist : MonoBehaviour {
                             float y = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y;
                             float z = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z;
 
+                            string pressureVal = "1";
+                            if (writePressure) pressureVal = "" + getNormalizedBrushSize(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushSize);
+
                             if (j == layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count - 1) {
-                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1}");
+                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":" + pressureVal + ", \"strength\":1}");
                                 sbb.Add("\t\t\t\t\t\t\t\t\t]");
                             } else {
-                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":1, \"strength\":1},");
+                                sbb.Add("\t\t\t\t\t\t\t\t\t\t{\"co\":[" + x + ", " + y + ", " + z + "], \"pressure\":" + pressureVal + ", \"strength\":1},");
                             }
                         }
                     } else {
