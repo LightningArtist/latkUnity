@@ -463,7 +463,7 @@ public class LightningArtist : MonoBehaviour {
     }
 
     float getNormalizedBrushSize(float s) {
-        return map(s, brushSizeRange.x, brushSizeRange.y, 0f, 1f);
+        return map(s, brushSizeRange.x, brushSizeRange.y, 0.1f, 1f);
     }
 
     float map(float s, float a1, float a2, float b1, float b2) {
