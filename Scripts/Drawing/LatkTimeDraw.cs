@@ -6,6 +6,7 @@ using SimpleJSON;
 
 public class LatkTimeDraw : LatkDrawing {
 
+    /*
 	public enum DrawMode { POINTS, LIVE };
 	public DrawMode drawMode = DrawMode.POINTS;
     public enum DrawState { WAIT, DRAW, ERASE };
@@ -200,16 +201,16 @@ public class LatkTimeDraw : LatkDrawing {
 		}
 		ready = true;
 	}
-
+    */
 }
 
-public class StrokeData {
 
+public class StrokeData {
+    /*
 	public List<Vector3> points = new List<Vector3>();
 
 	public Color color = new Color();
 
-	/*
 	public List<Vector3> getPoints() {
 		List<Vector3> returns = new List<Vector3>();
 		for (int i = 0; i < points.Count; i++) {
@@ -218,6 +219,5 @@ public class StrokeData {
 		return returns;
 	}
 	*/
-
 }
 
