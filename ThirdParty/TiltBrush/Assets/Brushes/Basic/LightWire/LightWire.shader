@@ -22,6 +22,7 @@ Shader "Brush/Special/LightWire" {
 	} 
 	SubShader {
 		Cull Back
+		ZTest Off
 		CGPROGRAM
 		#pragma target 3.0
 		#pragma surface surf StandardSpecular vertex:vert noshadow
@@ -95,7 +96,7 @@ Shader "Brush/Special/LightWire" {
 #ifdef AUDIO_REACTIVE
 			IN.color.rgb = IN.color.rgb * .25 + IN.color.rgb*_BeatOutput.x * .75;
 #endif
-			o.Emission += lights * IN.color.rgb; 
+			o.Emission += lights * ((IN.color.r + IN.color.g + IN.color.b)/4.0);
 
 			o.Albedo   = SrgbToNative3(o.Albedo);
 			o.Emission = SrgbToNative3(o.Emission);
