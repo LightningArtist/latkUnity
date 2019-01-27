@@ -17,6 +17,7 @@ public class LatkDrawing : MonoBehaviour {
     public bool createOnStart = true;
     public List<LatkStroke> strokes = new List<LatkStroke>();
     public Matrix4x4 transformMatrix;
+	public float strokeLife = 1f;
     public bool checkSelfDestruct = false;
 
     private void Awake() {
@@ -27,11 +28,13 @@ public class LatkDrawing : MonoBehaviour {
                 latk.mainColor = color;
                 latk.brushSize = brushSize;
                 latk.minDistance = minDistance;
-            } else if (latkSettings== LatkSettings.COPY_FROM_LATK) {
+				latk.strokeLife = strokeLife;
+            } else if (latkSettings == LatkSettings.COPY_FROM_LATK) {
                 brushPrefab = latk.brushPrefab;
                 color = latk.mainColor;
                 brushSize = latk.brushSize;
                 minDistance = latk.minDistance;
+				strokeLife = latk.strokeLife;
             }
         }
 
@@ -98,7 +101,10 @@ public class LatkDrawing : MonoBehaviour {
         brush.transform.SetParent(transform);
         brush.brushColor = color;
         brush.brushSize = brushSize;
-        return brush;
+		brush.selfDestruct = checkSelfDestruct;
+		brush.lifeTime = strokeLife;
+
+		return brush;
     }
 
     public LatkStroke makeEmpty() {
@@ -112,7 +118,8 @@ public class LatkDrawing : MonoBehaviour {
     // II. LINE
 
     public LatkStroke makeLineCore(Vector3 v1, Vector3 v2) {
-        LatkStroke brush = makeEmptyCore();
+		LatkStroke brush = makeEmptyCore();
+
         brush.points.Add(v1);
         brush.points.Add(v2);
         return brush;
@@ -146,7 +153,8 @@ public class LatkDrawing : MonoBehaviour {
 
     public LatkStroke makeCurveCore(List<Vector3> points) {
         LatkStroke brush = makeEmptyCore();
-        if (minDistance > 0f) points = filterMinDistance(points);
+
+		if (minDistance > 0f) points = filterMinDistance(points);
         brush.points = points;
         return brush;
     }
