@@ -73,20 +73,20 @@ public class LatkDrawing : MonoBehaviour {
     public void recordToLatk(List<LatkStroke> _strokes) {
         for (int i = 0; i < _strokes.Count; i++) {
             latk.brushSize = brushSize;
-            latk.inputInstantiateStroke(_strokes[i].brushColor, _strokes[i].points);
+            latk.inputInstantiateStrokeHead(_strokes[i].brushColor, _strokes[i].points);
         }
     }
 
     public void recordToLatk() {
         for (int i = 0; i < strokes.Count; i++) {
             latk.brushSize = brushSize;
-            latk.inputInstantiateStroke(strokes[i].brushColor, strokes[i].points);
+            latk.inputInstantiateStrokeHead(strokes[i].brushColor, strokes[i].points);
         }
     }
 
     public void recordToLatk(int index) {
         latk.brushSize = brushSize;
-        latk.inputInstantiateStroke(strokes[index].brushColor, strokes[index].points);
+        latk.inputInstantiateStrokeHead(strokes[index].brushColor, strokes[index].points);
     }
 
     // ~ ~ ~ ~ ~

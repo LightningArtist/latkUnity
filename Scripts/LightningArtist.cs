@@ -433,6 +433,21 @@ public class LightningArtist : MonoBehaviour {
         layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Add(b);
     }
 
+	public void inputInstantiateStrokeHead(Color c, List<Vector3> points) {
+		LatkStroke b = Instantiate(brushPrefab);
+		b.points = points;
+		if (brushMat[(int)brushMode]) b.mat = brushMat[(int)brushMode];
+		b.brushSize = brushSize;
+		b.brushColor = c;
+		if (useEndColor) {
+			b.brushEndColor = endColor;
+		} else {
+			b.brushEndColor = c;
+		}
+		b.transform.SetParent(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].transform);
+		layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Insert(0, b);
+	}
+
     void instantiateFrame() {
         LatkFrame f = Instantiate(framePrefab);
         f.transform.SetParent(layerList[currentLayer].transform);
