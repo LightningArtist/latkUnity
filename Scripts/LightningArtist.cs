@@ -916,6 +916,17 @@ public class LightningArtist : MonoBehaviour {
         if (showOnionSkin) inputShowFrames();
     }
 
+    public void inputFirstFrame() {
+        jumpToFrame(0);
+        changeFrame(0);
+    }
+
+    public void inputLastFrame() {
+        int lastFrame = layerList[currentLayer].frameList.Count - 1;
+        jumpToFrame(lastFrame);
+        changeFrame(0);
+    }
+
     public void inputShowFrames() {
         if (textMeshRen != null) textMeshRen.enabled = true;
         if (floorRen != null) floorRen.enabled = true;
