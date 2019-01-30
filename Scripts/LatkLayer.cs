@@ -21,7 +21,16 @@ public class LatkLayer : MonoBehaviour {
 		}
 	}
 
-    //private void Update() {
+    public void deleteFrame() {
+        try {
+            Destroy(frameList[currentFrame].gameObject);
+        } catch (UnityException e) { }
+        frameList.RemoveAt(currentFrame);
+        currentFrame--;
+        if (currentFrame < 0) currentFrame = 0;
+    }
+
+     //private void Update() {
         //transform.position = Vector3.Lerp(transform.position, parentPos, lerpSpeed);
     //}
 

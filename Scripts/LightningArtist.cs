@@ -300,8 +300,10 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void endStroke() {
-        if (!isPlaying && fillMeshStrokes) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].fillMesh();
-        if (!isPlaying && refineStrokes) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].refine();
+        if (!isPlaying) {
+            if (fillMeshStrokes) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].fillMesh();
+            if (refineStrokes) layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count - 1].refine();
+        }
         isDrawing = false;
     }
 
@@ -949,6 +951,25 @@ public class LightningArtist : MonoBehaviour {
 
     public void inputEraseFirstStroke() {
         eraseFirstStroke();
+    }
+
+    public void inputDeleteFrame() {
+        isPlaying = false;
+        if (layerList[currentLayer].frameList.Count > 1) { // more than one frame exists on this layer, so OK to delete this frame
+            layerList[currentLayer].deleteFrame();
+        } else {
+            if (layerList.Count > 1) { // more than one layer exists, so OK to delete this layer
+                try {
+                    Destroy(layerList[currentLayer].gameObject);
+                } catch (UnityException e) { }
+                layerList.RemoveAt(currentLayer);
+                currentLayer--;
+                if (currentLayer < 0) currentLayer = 0;
+            } else { // we're down to one layer and one frame, so just clear the frame's strokes without deleting it
+                layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].reset();
+            }
+        }
+        jumpToFrame(layerList[currentLayer].currentFrame);
     }
 
     public void inputPush() {
