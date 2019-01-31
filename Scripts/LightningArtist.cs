@@ -35,9 +35,7 @@ using ICSharpCode.SharpZipLib.Zip;
 
 public class LightningArtist : MonoBehaviour {
 
-    public enum BrushMode { ADD, SURFACE, UNLIT };
-    public BrushMode brushMode = BrushMode.ADD;
-    public Material[] brushMat;
+    [Header("~ Objects ~")]
     public Transform target;
     public Transform scaleRef;
     public LatkLayer layerPrefab;
@@ -47,41 +45,51 @@ public class LightningArtist : MonoBehaviour {
     public AudioSource audio;
     public Animator animator;
     public Renderer floorRen;
+    public Renderer[] animatorRen;
+
+    public enum BrushMode { ADD, SURFACE, UNLIT };
+    [Header("~ Brush Options ~")]
+    public BrushMode brushMode = BrushMode.ADD;
+    public Material[] brushMat;
     public Color mainColor = new Color(0.5f, 0.5f, 0.5f);
     public Color endColor = new Color(0.5f, 0.5f, 0.5f);
     public bool useEndColor = false;
-    public int drawTrailLength = 4;
+    public bool fillMeshStrokes = false;
+    public bool refineStrokes = false;
+    public bool drawWhilePlaying = false;
     public float strokeLife = 5f;
     public bool killStrokes = false;
-    public bool writePressure = false;
+    public bool useCollisions = false;
 
+    [Header("~ UI Options ~")]
+    public float minDistance = 0.0001f;
+    public float brushSize = 0.008f;
+    public float pushSpeed = 0.01f;
+    public float pushRange = 0.05f;
+    public float eraseRange = 0.05f;
+    public float colorPickRange = 0.05f;
+
+    [Header("~ File Options ~")]
     public string readFileName = "LatkStrokes-saved.json";
     public bool readOnStart = false;
     public bool playOnStart = false;
     public string writeFileName = "LatkStrokes-saved.json";
     public bool useTimestamp = false;
+    public bool writePressure = false;
     public bool createFrameWithLayer = false;
     public bool newLayerOnRead = false;
-    public bool drawWhilePlaying = false;
-    public bool fillMeshStrokes = false;
-    public bool refineStrokes = false;
 
     // NONE plays empty frames as empty. 
     // WRITE copies last good frame into empty frame (will save out). 
     // DISPLAY holds last good frame but doesn't copy (won't save out).
     public enum FillEmptyMethod { NONE, WRITE, DISPLAY };
+    [Header("~ Display Options ~")]
     public FillEmptyMethod fillEmptyMethod = FillEmptyMethod.DISPLAY;
-
-    public float minDistance = 0.0001f;
-    public float brushSize = 0.008f;
     public float frameInterval = 12f;
-    public float eraseRange = 0.05f;
-    public float pushRange = 0.05f;
-    public float colorPickRange = 0.05f;
-    public float pushSpeed = 0.01f;
     public int onionSkinRange = 5;
-
-    public Renderer[] animatorRen;
+    public int drawTrailLength = 4;
+    public float frameBrightNormal = 0.5f;
+    public float frameBrightDim = 0.05f;
 
     [HideInInspector] public List<LatkLayer> layerList;
     [HideInInspector] public int currentLayer = 0;
@@ -96,13 +104,14 @@ public class LightningArtist : MonoBehaviour {
     [HideInInspector] public bool armReadFile = false;
     [HideInInspector] public bool armWriteFile = false;
 
+    [HideInInspector] public Vector3 lastHit = Vector3.zero;
+    [HideInInspector] public Vector3 thisHit = Vector3.zero;
+
     private bool firstRun = true;
     private float lastFrameTime = 0f;
     private Renderer textMeshRen;
     private int rememberFrame = 0;
     private float markTime = 0f;
-    public float frameBrightNormal = 0.5f;
-    public float frameBrightDim = 0.05f;
     private Vector2 brushSizeRange = new Vector2(0f, 1f);
 
     private float normalizedFrameInterval = 0f;
@@ -1042,10 +1051,6 @@ public class LightningArtist : MonoBehaviour {
             audio.Stop();
         }
     }
-
-    public bool useCollisions = false;
-    [HideInInspector] public Vector3 lastHit = Vector3.zero;
-    [HideInInspector] public Vector3 thisHit = Vector3.zero;
 
     public void updateCollision() {
         RaycastHit hit;
