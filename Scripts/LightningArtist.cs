@@ -166,7 +166,7 @@ public class LightningArtist : MonoBehaviour {
             armReadFile = true;
         }
 
-        brushSizeDelta = brushSize / 50f;
+        brushSizeDelta = brushSize / 30f;
     }
 
     void Update() {
