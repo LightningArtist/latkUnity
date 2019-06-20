@@ -63,12 +63,12 @@ Shader "Latk/ParticleAdd" {
 				float _InvFade;
 			
 				fixed4 frag (v2f i) : SV_Target {
-					#ifdef SOFTPARTICLES_ON
-					float sceneZ = LinearEyeDepth (SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.projPos)));
-					float partZ = i.projPos.z;
-					float fade = saturate (_InvFade * (sceneZ-partZ));
-					i.color.a *= fade;
-					#endif
+					//#ifdef SOFTPARTICLES_ON
+					//float sceneZ = LinearEyeDepth (SAMPLE_DEPTH_TEXTURE_PROJ(_CameraDepthTexture, UNITY_PROJ_COORD(i.projPos)));
+					//float partZ = i.projPos.z;
+					//float fade = saturate (_InvFade * (sceneZ-partZ));
+					//i.color.a *= fade;
+					//#endif
 				
 					fixed4 col = 2.0f * i.color * _Color * tex2D(_MainTex, i.texcoord);
 					UNITY_APPLY_FOG_COLOR(i.fogCoord, col, fixed4(0,0,0,0)); // fog towards black due to our blend mode
