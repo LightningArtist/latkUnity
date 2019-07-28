@@ -1,5 +1,5 @@
 # latkUnity
-Read and write Latk files in Unity. (Last tested with Unity 2018.2.)
+Read and write Latk files in Unity. (Last tested with Unity 2018.4.)
 
 To use in a Unity project, add the repo folder to your Assets folder, or download a package from Releases.
 
