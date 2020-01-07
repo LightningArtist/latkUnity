@@ -37,7 +37,6 @@ public class LightningArtist : MonoBehaviour {
 
     [Header("~ Objects ~")]
     public Transform target;
-    public Transform scaleRef;
     public LatkLayer layerPrefab;
     public LatkFrame framePrefab;
     public LatkStroke brushPrefab;
@@ -662,9 +661,10 @@ public class LightningArtist : MonoBehaviour {
                     if (layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count > 0) {
                         sbb.Add("\t\t\t\t\t\t\t\t\t\"points\":[");
                         for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-                            float x = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].x;
-                            float y = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].y;
-                            float z = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j].z;
+                            Vector3 pt = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].transform.TransformPoint(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j]);
+                            float x = pt.x;
+                            float y = pt.y;
+                            float z = pt.z;
 
                             string pressureVal = "1";
                             if (writePressure) pressureVal = "" + getNormalizedBrushSize(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushSize);
@@ -781,14 +781,14 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doErase() {
-        //isPlaying = false;
-
         int strokeToDelete = -1;
 
         for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
             bool foundStroke = false;
+            Vector3 t = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].transform.InverseTransformPoint(target.position);
+
             for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-                if (!foundStroke && Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < eraseRange * scaleRef.localScale.x) {
+                if (!foundStroke && Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], t) < eraseRange) {
                     strokeToDelete = i;
                     foundStroke = true;
                 }
@@ -812,12 +812,12 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doPush() {
-        //isPlaying = false;
-
         for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
+            Vector3 t = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].transform.InverseTransformPoint(target.position);
+
             for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-                if (Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < pushRange * scaleRef.localScale.x) {
-                    layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j] = Vector3.Lerp(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position, pushSpeed * scaleRef.localScale.x);
+                if (Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], t) < pushRange) {
+                    layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j] = Vector3.Lerp(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], t, pushSpeed);
                     layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].isDirty = true;
                 }
             }
@@ -825,11 +825,11 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doColorPick() {
-        //isPlaying = false;
-
         for (int i = 0; i < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count; i++) {
+            Vector3 t = layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].transform.InverseTransformPoint(target.position);
+
             for (int j = 0; j < layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points.Count; j++) {
-                if (Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], target.position) < colorPickRange * scaleRef.localScale.x) {
+                if (Vector3.Distance(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].points[j], t) < colorPickRange) {
                     mainColor = new Color(layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.r, layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.g, layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList[i].brushColor.b);
                 }
             }
@@ -855,7 +855,11 @@ public class LightningArtist : MonoBehaviour {
         Debug.Log("Before copy (" + index + "): " + layerList[currentLayer].frameList[index - 1].brushStrokeList.Count + " " + layerList[currentLayer].frameList[index].brushStrokeList.Count);
         for (int i = 0; i < layerList[currentLayer].frameList[index - 1].brushStrokeList.Count; i++) {
             instantiateStroke(mainColor);
-            layerList[currentLayer].frameList[index].brushStrokeList[i].setPoints(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points);
+            List<Vector3> newPoints = new List<Vector3>();
+            for (int j=0; j< layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points.Count; j++) {
+                newPoints.Add(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].transform.TransformPoint(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points[j]));
+            }
+            layerList[currentLayer].frameList[index].brushStrokeList[i].setPoints(newPoints);
             layerList[currentLayer].frameList[index].brushStrokeList[i].setBrushColor(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].brushColor);
             layerList[currentLayer].frameList[index].brushStrokeList[i].isDirty = true;
         }
@@ -1067,7 +1071,7 @@ public class LightningArtist : MonoBehaviour {
 
     public Vector3 getCollision() {
         if (thisHit != Vector3.zero) {
-            if (lastHit == Vector3.zero || Vector3.Distance(thisHit, lastHit) < (10f * scaleRef.localScale.z)) {// brushSize) {
+            if (lastHit == Vector3.zero || Vector3.Distance(thisHit, lastHit) < 10f) {// brushSize) {
                 lastHit = Vector3.Lerp(thisHit, Camera.main.transform.position, 0.02f);
                 return lastHit;
             } else {
