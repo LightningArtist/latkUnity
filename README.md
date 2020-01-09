@@ -11,5 +11,5 @@ git submodule add https://github.com/LightningArtist/latkUnity ./Assets/latkUnit
 
 To include as a package (Unity 2018.4 and later), edit your project's ./Packages/manifest.json file:
 ```
-"es.latk.latkunity": "https://github.com/LightningArtist/latkUnity.git#package"  
+"es.latk.latkunity": "https://github.com/LightningArtist/latkUnity.git"  
 ```
