@@ -1,0 +1,11 @@
+{
+  "name": "es.latk.latkunity",
+  "version": "1.0",
+  "displayName": "Lightning Artist Toolkit",
+  "description": "Pipeline tools for volumetric animation",
+  "unity": "2018.4",
+  "author": {
+    "name": "Nick Fox-Gieg",
+    "url": "https://fox-gieg.com"
+  } 
+}
