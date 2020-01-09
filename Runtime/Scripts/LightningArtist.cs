@@ -105,6 +105,7 @@ public class LightningArtist : MonoBehaviour {
 
     [HideInInspector] public Vector3 lastHit = Vector3.zero;
     [HideInInspector] public Vector3 thisHit = Vector3.zero;
+    [HideInInspector] public string url;
 
     private bool firstRun = true;
     private float lastFrameTime = 0f;
@@ -511,7 +512,7 @@ public class LightningArtist : MonoBehaviour {
         }
         layerList = new List<LatkLayer>();
 
-        string url = "";
+        url = "";
 
         #if UNITY_ANDROID
 		url = Path.Combine("jar:file://" + Application.dataPath + "!/assets/", readFileName);
@@ -744,7 +745,7 @@ public class LightningArtist : MonoBehaviour {
         s.Add("    ]");
         s.Add("}");
 
-        string url = "";
+        url = "";
         string tempName = "";
         if (useTimestamp) {
             string extO = "";
