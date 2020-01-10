@@ -761,13 +761,14 @@ public class LightningArtist : MonoBehaviour {
 
         url = Path.Combine(Application.dataPath, tempName);
 
-        #if UNITY_ANDROID
-		url = "/sdcard/Movies/" + tempName;
-        #endif
+#if UNITY_ANDROID
+        //url = "/sdcard/Movies/" + tempName;
+        url = Path.Combine(Application.persistentDataPath, tempName);
+#endif
 
-        #if UNITY_IOS
+#if UNITY_IOS
 		url = Path.Combine(Application.persistentDataPath, tempName);
-        #endif
+#endif
 
         if (useZip) {
             saveJsonAsZip(url, tempName, string.Join("\n", s.ToArray()));
