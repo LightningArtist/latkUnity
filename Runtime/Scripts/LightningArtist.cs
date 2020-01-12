@@ -107,6 +107,8 @@ public class LightningArtist : MonoBehaviour {
     [HideInInspector] public Vector3 thisHit = Vector3.zero;
     [HideInInspector] public string url;
 
+    [HideInInspector] public string statusText = "";
+
     private bool firstRun = true;
     private float lastFrameTime = 0f;
     private Renderer textMeshRen;
@@ -171,11 +173,11 @@ public class LightningArtist : MonoBehaviour {
 
     void Update() {
         if (armReadFile) {
-            if (textMesh != null) textMesh.text = "READING...";
+            statusText = "READING...";
             StartCoroutine(readLatkStrokes());
             armReadFile = false;
         } else if (armWriteFile) {
-            if (textMesh != null) textMesh.text = "WRITING...";
+            statusText = "WRITING...";
             StartCoroutine(writeLatkStrokes());
             armWriteFile = false;
         } else if (!isReadingFile && !isWritingFile) {
@@ -269,14 +271,16 @@ public class LightningArtist : MonoBehaviour {
                 endStroke();
             }
 
-            if (textMesh != null) textMesh.text = "frame " + (layerList[currentLayer].currentFrame + 1) + " / " + layerList[currentLayer].frameList.Count;
+            statusText = "frame " + (layerList[currentLayer].currentFrame + 1) + " / " + layerList[currentLayer].frameList.Count;
 
-            if (layerList.Count > 1 && textMesh != null) textMesh.text = "" + (currentLayer + 1) + ". " + textMesh.text;
+            if (layerList.Count > 1) statusText = "" + (currentLayer + 1) + ". " + statusText;
 
             if (layerList[currentLayer].frameList.Count < layerList[longestLayer].frameList.Count && textMesh != null) textMesh.text += " (" + layerList[longestLayer].frameList.Count + ")";
         }
 
         lastTargetPos = target.position;
+
+        if (textMesh != null) textMesh.text = statusText;
     }
 
     int getLongestLayer() {
@@ -585,7 +589,7 @@ public class LightningArtist : MonoBehaviour {
 
                     Debug.Log("Adding frame " + (layerList[currentLayer].currentFrame + 1) + ": stroke " + (i + 1) + " of " + layerList[currentLayer].frameList[layerList[currentLayer].currentFrame].brushStrokeList.Count + ".");
                 }
-                if (textMesh != null) textMesh.text = "READING " + (layerList[currentLayer].currentFrame + 1) + " / " + jsonNode["grease_pencil"][0]["layers"][0]["frames"].Count;
+                statusText = "READING " + (layerList[currentLayer].currentFrame + 1) + " / " + jsonNode["grease_pencil"][0]["layers"][0]["frames"].Count;
                 Debug.Log("Ending frame " + (layerList[currentLayer].currentFrame + 1) + ".");
                 yield return new WaitForSeconds(consoleUpdateInterval);
             }
@@ -692,7 +696,7 @@ public class LightningArtist : MonoBehaviour {
                     sb.Add(string.Join("\n", sbb.ToArray()));
                 }
 
-                if (textMesh != null) textMesh.text = "WRITING " + (layerList[currentLayer].currentFrame + 1) + " / " + layerList[currentLayer].frameList.Count;
+                statusText = "WRITING " + (layerList[currentLayer].currentFrame + 1) + " / " + layerList[currentLayer].frameList.Count;
                 Debug.Log("Ending frame " + (layerList[currentLayer].currentFrame + 1) + ".");
                 yield return new WaitForSeconds(consoleUpdateInterval);
 
