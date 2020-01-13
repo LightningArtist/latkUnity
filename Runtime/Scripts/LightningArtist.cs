@@ -275,7 +275,7 @@ public class LightningArtist : MonoBehaviour {
 
             if (layerList.Count > 1) statusText = "" + (currentLayer + 1) + ". " + statusText;
 
-            if (layerList[currentLayer].frameList.Count < layerList[longestLayer].frameList.Count && textMesh != null) textMesh.text += " (" + layerList[longestLayer].frameList.Count + ")";
+            if (layerList[currentLayer].frameList.Count < layerList[longestLayer].frameList.Count) statusText += " (" + layerList[longestLayer].frameList.Count + ")";
         }
 
         lastTargetPos = target.position;
@@ -875,7 +875,7 @@ public class LightningArtist : MonoBehaviour {
     // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ 
 
     public void inputNewFrame() {
-        if (textMeshRen != null) textMeshRen.enabled = true;
+        //if (textMeshRen != null) textMeshRen.enabled = true;
         instantiateFrame();
         layerList[currentLayer].currentFrame = layerList[currentLayer].frameList.Count - 1;
         showAllFrames(showOnionSkin);
@@ -912,7 +912,7 @@ public class LightningArtist : MonoBehaviour {
             doAudioStop();
         }
 
-        if (textMeshRen != null) textMeshRen.enabled = !isPlaying;
+        //if (textMeshRen != null) textMeshRen.enabled = !isPlaying;
 
         if (animatorRen.Length != 0 && animatorRen[0] != null) {
             for (int i = 0; i < animatorRen.Length; i++) {
@@ -924,14 +924,14 @@ public class LightningArtist : MonoBehaviour {
     }
 
     public void inputFrameBack() {
-        if (textMeshRen != null) textMeshRen.enabled = true;
+        //if (textMeshRen != null) textMeshRen.enabled = true;
         changeFrame(-1);
         doAudioPlay();
         if (showOnionSkin) inputShowFrames();
     }
 
     public void inputFrameForward() {
-        if (textMeshRen != null) textMeshRen.enabled = true;
+        //if (textMeshRen != null) textMeshRen.enabled = true;
         changeFrame(1);
         doAudioPlay();
         if (showOnionSkin) inputShowFrames();
@@ -949,13 +949,13 @@ public class LightningArtist : MonoBehaviour {
     }
 
     public void inputShowFrames() {
-        if (textMeshRen != null) textMeshRen.enabled = true;
+        //if (textMeshRen != null) textMeshRen.enabled = true;
         if (floorRen != null) floorRen.enabled = true;
         showAllFrames(true);
     }
 
     public void inputHideFrames() {
-        if (textMeshRen != null) textMeshRen.enabled = true;
+        //if (textMeshRen != null) textMeshRen.enabled = true;
         if (floorRen != null) floorRen.enabled = false;
         showAllFrames(false);
     }
