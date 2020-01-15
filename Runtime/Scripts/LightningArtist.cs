@@ -63,10 +63,10 @@ public class LightningArtist : MonoBehaviour {
     [Header("~ UI Options ~")]
     public float minDistance = 0.0001f;
     public float brushSize = 0.008f;
-    public float pushSpeed = 0.01f;
-    public float pushRange = 0.05f;
-    public float eraseRange = 0.05f;
-    public float colorPickRange = 0.05f;
+    [HideInInspector] public float pushSpeed = 0.01f;
+    [HideInInspector] public float pushRange = 0.05f;
+    [HideInInspector] public float eraseRange = 0.05f;
+    [HideInInspector] public float colorPickRange = 0.05f;
 
     [Header("~ File Options ~")]
     public string readFileName = "LatkStrokes-saved.json";
@@ -172,6 +172,8 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void Update() {
+    	pushSpeed = pushRange = eraseRange = colorPickRange = brushSize;
+    	
         if (armReadFile) {
             statusText = "READING...";
             StartCoroutine(readLatkStrokes());
