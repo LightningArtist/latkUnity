@@ -1,5 +1,5 @@
 {
-  "name": "es.latk.latkunity",
+  "name": "org.lightningartist.latkunity",
   "version": "1.0.0",
   "displayName": "Lightning Artist Toolkit",
   "description": "Pipeline tools for volumetric animation",
