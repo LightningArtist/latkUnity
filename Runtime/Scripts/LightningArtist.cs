@@ -26,12 +26,13 @@ http://fox-gieg.com
 */
 
 using UnityEngine;
+using UnityEngine.Networking;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using SimpleJSON;
-using ICSharpCode.SharpZipLib.Core;
-using ICSharpCode.SharpZipLib.Zip;
+using ICSharpCode.SharpZipLibUnityPort.Core;
+using ICSharpCode.SharpZipLibUnityPort.Zip;
 
 public class LightningArtist : MonoBehaviour {
 
@@ -544,16 +545,16 @@ public class LightningArtist : MonoBehaviour {
 		url = Path.Combine("file://" + Application.dataPath, readFileName);		
         #endif
 
-        WWW www = new WWW(url);
-        yield return www;
+        UnityWebRequest www = UnityWebRequest.Get(url);
+        yield return www.SendWebRequest();
 
         Debug.Log("+++ File reading finished. Begin parsing...");
         yield return new WaitForSeconds(consoleUpdateInterval);
 
         if (useZip) {
-            jsonNode = getJsonFromZip(www.bytes);
+            jsonNode = getJsonFromZip(www.downloadHandler.data);
         } else {
-            jsonNode = JSON.Parse(www.text);
+            jsonNode = JSON.Parse(www.downloadHandler.text);
         }
 
         for (int f = 0; f < jsonNode["grease_pencil"][0]["layers"].Count; f++) {
