@@ -1161,7 +1161,7 @@ public class LightningArtist : MonoBehaviour {
         MemoryStream outputMemStream = new MemoryStream();
         ZipOutputStream zipStream = new ZipOutputStream(outputMemStream);
 
-        zipStream.SetLevel(3); //0-9, 9 being the highest level of compression
+        zipStream.SetLevel(4); //0-9, 9 being the highest level of compression
 
         string fileNameMinusExtension = "";
         string[] nameTemp = fileName.Split('.');
