@@ -62,7 +62,7 @@ public class LightningArtist : MonoBehaviour {
     public bool useCollisions = false;
 
     [Header("~ UI Options ~")]
-    public float minDistance = 0.0001f;
+    public float minDistance = -1f; //0.0001f;
     public float brushSize = 0.008f;
     [HideInInspector] public float pushSpeed = 0.01f;
     [HideInInspector] public float pushRange = 0.05f;
@@ -252,13 +252,17 @@ public class LightningArtist : MonoBehaviour {
 
             // ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
-            try {
-                if (isDrawing && Vector3.Distance(lastTargetPos, target.position) > minDistance) {
+            //try {
+            if (isDrawing) {
+                if (minDistance > 0f) {
+                    if (isDrawing && Vector3.Distance(lastTargetPos, target.position) > minDistance) buildStroke();
+                } else {
                     buildStroke();
                 }
-            } catch (System.Exception e) {
-                Debug.Log(e.Data);
             }
+            //} catch (System.Exception e) {
+                //Debug.Log(e.Data);
+            //}
 
             if (clicked && !isDrawing) {
                 beginStroke();
