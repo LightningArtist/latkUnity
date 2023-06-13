@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class LatkLayer : MonoBehaviour {
 
-	public string name = "";
+	public string info = "";
     public Vector3 parentPos = Vector3.zero;
 
     [HideInInspector] public List<LatkFrame> frameList;

@@ -42,7 +42,7 @@ public class LightningArtist : MonoBehaviour {
     public LatkFrame framePrefab;
     public LatkStroke brushPrefab;
     public TextMesh textMesh;
-    public AudioSource audio;
+    public AudioSource sound;
     public Animator animator;
     public Renderer floorRen;
     public Renderer[] animatorRen;
@@ -194,13 +194,13 @@ public class LightningArtist : MonoBehaviour {
 
             if (isPlaying) {
                 float t = 0f;
-                if (audio != null) {
-                    t = markTime + audio.time;
+                if (sound != null) {
+                    t = markTime + sound.time;
                 } else {
                     t = Time.realtimeSinceStartup;
                 }
 
-                if ((audio != null && Time.realtimeSinceStartup > markTime + audio.clip.length) || (layerList[longestLayer].frameList.Count > 1 && t > lastFrameTime + frameInterval)) {
+                if ((sound != null && Time.realtimeSinceStartup > markTime + sound.clip.length) || (layerList[longestLayer].frameList.Count > 1 && t > lastFrameTime + frameInterval)) {
                     if (drawWhilePlaying) {
                         endStroke();
                         isDrawing = false;
@@ -228,10 +228,10 @@ public class LightningArtist : MonoBehaviour {
                             if (i == longestLayer) {
                                 animVal = 0f;
                                 markTime = Time.realtimeSinceStartup;
-                                if (audio != null) {
-                                    audio.time = 0f;
-                                    audio.Stop();
-                                    audio.Play();
+                                if (sound != null) {
+                                    sound.time = 0f;
+                                    sound.Stop();
+                                    sound.Play();
                                 }
                             }
                         }
@@ -245,7 +245,7 @@ public class LightningArtist : MonoBehaviour {
                     }
                 }
             } else {
-                if (audio != null && audio.isPlaying && Time.realtimeSinceStartup > markTime + frameInterval) audio.Stop();
+                if (sound != null && sound.isPlaying && Time.realtimeSinceStartup > markTime + frameInterval) sound.Stop();
             }
 
             if (animator != null) animator.Play(clipName, clipLayer, animVal);
@@ -564,7 +564,7 @@ public class LightningArtist : MonoBehaviour {
         for (int f = 0; f < jsonNode["grease_pencil"][0]["layers"].Count; f++) {
             instantiateLayer();
             currentLayer = f;
-            layerList[currentLayer].name = jsonNode["grease_pencil"][0]["layers"][f]["name"];
+            layerList[currentLayer].info = jsonNode["grease_pencil"][0]["layers"][f]["name"];
             for (int h = 0; h < jsonNode["grease_pencil"][0]["layers"][f]["frames"].Count; h++) {
                 Debug.Log("Starting frame " + (layerList[currentLayer].currentFrame + 1) + ".");
                 instantiateFrame();
@@ -736,8 +736,8 @@ public class LightningArtist : MonoBehaviour {
             currentLayer = i;
 
             s.Add("\t\t\t\t{");
-            if (layerList[currentLayer].name != null && layerList[currentLayer].name != "") {
-                s.Add("\t\t\t\t\t\"name\": \"" + layerList[currentLayer].name + "\",");
+            if (layerList[currentLayer].info != null && layerList[currentLayer].info != "") {
+                s.Add("\t\t\t\t\t\"name\": \"" + layerList[currentLayer].info + "\",");
             } else {
                 s.Add("\t\t\t\t\t\"name\": \"UnityLayer " + (currentLayer + 1) + "\",");
             }
@@ -1053,19 +1053,19 @@ public class LightningArtist : MonoBehaviour {
     }
 
     void doAudioPlay() {
-        if (audio != null) {
+        if (sound != null) {
             markTime = Time.realtimeSinceStartup;
-            if (layerList[currentLayer].currentFrame * frameInterval <= audio.clip.length) {
-                audio.time = layerList[currentLayer].currentFrame * frameInterval;
-                audio.Stop();
-                audio.Play();
+            if (layerList[currentLayer].currentFrame * frameInterval <= sound.clip.length) {
+                sound.time = layerList[currentLayer].currentFrame * frameInterval;
+                sound.Stop();
+                sound.Play();
             }
         }
     }
 
     void doAudioStop() {
-        if (audio != null) {
-            audio.Stop();
+        if (sound != null) {
+            sound.Stop();
         }
     }
 
