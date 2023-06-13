@@ -11,7 +11,7 @@ public class LatkSpriteToBrush : MonoBehaviour {
 	//public Renderer[] destMesh;
 	public LightningArtist latk;
 
-	private bool firstRun = true;
+	//private bool firstRun = true;
 
 	void Start() {
 		sourceSprite = GetComponent<SpriteRenderer>();

@@ -110,10 +110,10 @@ public class LightningArtist : MonoBehaviour {
 
     [HideInInspector] public string statusText = "";
 
-    private bool firstRun = true;
+    //private bool firstRun = true;
     private float lastFrameTime = 0f;
     private Renderer textMeshRen;
-    private int rememberFrame = 0;
+    //private int rememberFrame = 0;
     private float markTime = 0f;
     private Vector2 brushSizeRange = new Vector2(0f, 1f);
 
@@ -124,8 +124,8 @@ public class LightningArtist : MonoBehaviour {
     private Vector3 lastTargetPos = Vector3.zero;
 
     private float consoleUpdateInterval = 0f;
-    private int debugTextCurrentFrame = 0;
-    private int debugTextLastFrame = 0;
+    //private int debugTextCurrentFrame = 0;
+    //private int debugTextLastFrame = 0;
     private int longestLayer = 0;
     private float brushSizeDelta = 0f;
 

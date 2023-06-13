@@ -8,8 +8,8 @@ public class LatkInputGamepad : MonoBehaviour {
 
 	private bool blockStickHMax = false;
 	private bool blockStickHMin = false;
-	private bool blockStickVMax = false;
-	private bool blockStickVMin = false;
+	//private bool blockStickVMax = false;
+	//private bool blockStickVMin = false;
 	private float stickThreshold = 0.9f;
 
 	void Update() {
