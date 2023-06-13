@@ -24,7 +24,9 @@ public class LatkLayer : MonoBehaviour {
     public void deleteFrame() {
         try {
             Destroy(frameList[currentFrame].gameObject);
-        } catch (UnityException e) { }
+        } catch (UnityException e) {
+            Debug.Log(e.Message);
+        }
         frameList.RemoveAt(currentFrame);
         currentFrame--;
         if (currentFrame < 0) currentFrame = 0;

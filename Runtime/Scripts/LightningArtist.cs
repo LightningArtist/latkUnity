@@ -575,7 +575,9 @@ public class LightningArtist : MonoBehaviour {
                     float py = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["parent_location"][2].AsFloat / 10f;
                     float pz = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["parent_location"][1].AsFloat / 10f;
                     layerList[currentLayer].frameList[h].parentPos = new Vector3(px, py, pz);
-                } catch (UnityException e) { }
+                } catch (UnityException e) {
+                    Debug.Log(e.Message);
+                }
 
                 for (int i = 0; i < jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"].Count; i++) {
                     float r = jsonNode["grease_pencil"][0]["layers"][f]["frames"][h]["strokes"][i]["color"][0].AsFloat;
@@ -987,7 +989,9 @@ public class LightningArtist : MonoBehaviour {
             if (layerList.Count > 1) { // more than one layer exists, so OK to delete this layer
                 try {
                     Destroy(layerList[currentLayer].gameObject);
-                } catch (UnityException e) { }
+                } catch (UnityException e) {
+                    Debug.Log(e.Message);
+                }
                 layerList.RemoveAt(currentLayer);
                 currentLayer--;
                 if (currentLayer < 0) currentLayer = 0;

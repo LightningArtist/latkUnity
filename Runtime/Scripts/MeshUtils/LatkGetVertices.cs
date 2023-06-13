@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-public class GetVertices : MonoBehaviour {
+public class LatkGetVertices : MonoBehaviour {
 
     public bool alwaysUpdateSource = false;
 

@@ -37,7 +37,9 @@ public class LatkStroke : MonoBehaviour {
             mf = GetComponent<MeshFilter>();
             mesh = new Mesh();
             meshRen = GetComponent<MeshRenderer>();
-        } catch (UnityException e) { }
+        } catch (UnityException e) {
+            Debug.Log(e.Message);
+        }
 
         simplifyTolerance = brushSize / 10f;
     }
@@ -213,7 +215,7 @@ public class LatkStroke : MonoBehaviour {
             //uvs[i] = new Vector2(vertices[i].x, vertices[i].y);
         //}
 
-        Triangulator tr = new Triangulator(vertices);
+        LatkTriangulator tr = new LatkTriangulator(vertices);
         int[] triangles = tr.Triangulate();
         mesh.vertices = vertices;
         mesh.triangles = triangles;

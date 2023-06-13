@@ -8,7 +8,7 @@ public class LatkMesh : LatkDrawing {
     public enum MeshMode { EDGE, FILL, EDGE_FILL}
     public MeshMode meshMode = MeshMode.EDGE_FILL;
     public bool alwaysUpdate = true;
-    public GetVertices getVertices;
+    public LatkGetVertices getVertices;
     public int fillLines = 100;
     public int smoothReps = 200;
     public float randomize = 0.1f;
@@ -17,7 +17,7 @@ public class LatkMesh : LatkDrawing {
     private float interval = 0f;
 
     private void Awake() {
-        if (!getVertices) getVertices = GetComponent<GetVertices>();
+        if (!getVertices) getVertices = GetComponent<LatkGetVertices>();
     }
 
     private void Start() {

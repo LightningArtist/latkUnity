@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BrushPreview : MonoBehaviour {
+public class LatkBrushPreview : MonoBehaviour {
 
     public LightningArtist latk;
     //public Transform target;
