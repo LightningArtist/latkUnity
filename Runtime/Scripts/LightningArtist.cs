@@ -31,8 +31,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using SimpleJSON;
-using ICSharpCode.SharpZipLibUnityPort.Core;
-using ICSharpCode.SharpZipLibUnityPort.Zip;
+using ICSharpCode.SharpZipLib.Core;
+using ICSharpCode.SharpZipLib.Zip;
 
 public class LightningArtist : MonoBehaviour {
 
