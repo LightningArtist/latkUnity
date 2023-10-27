@@ -10,7 +10,7 @@ Shader "Latk/AddFlat" {
 		Tags { "Queue"="Transparent" "IgnoreProjector"="True" "RenderType"="Transparent" }
 		Blend SrcAlpha One
 		ColorMask RGB
-		Cull Off Lighting Off ZWrite Off
+		Cull Off Lighting Off //ZWrite Off
 	
 		SubShader {
 			Pass {
