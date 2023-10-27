@@ -875,6 +875,7 @@ public class LightningArtist : MonoBehaviour {
                 newPoints.Add(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].transform.TransformPoint(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].points[j]));
             }
             layerList[currentLayer].frameList[index].brushStrokeList[i].setPoints(newPoints);
+            layerList[currentLayer].frameList[index].brushStrokeList[i].setBrushSize(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].brushSize);
             layerList[currentLayer].frameList[index].brushStrokeList[i].setBrushColor(layerList[currentLayer].frameList[index - 1].brushStrokeList[i].brushColor);
             layerList[currentLayer].frameList[index].brushStrokeList[i].isDirty = true;
         }
