@@ -1,6 +1,6 @@
 {
   "name": "org.lightningartist.latk",
-  "version": "1.0.1",
+  "version": "1.1.1",
   "displayName": "Lightning Artist Toolkit",
   "description": "Pipeline tools for volumetric animation",
   "unity": "2018.4",
